@@ -1,0 +1,13 @@
+# create env 
+conda creat -n [env_name] python==3.10.4
+cuda = 12.2
+cudann=8.9.4
+pip install opencv-python
+pip install matplotlib
+pip install numpy,pandas seaborn scikit-learn
+pip install spectral
+pip install vit-keras
+pip install tensorflow-addons
+pip install keras_cv_attention_models
+pip install scipy
+pip install PyWavelets
