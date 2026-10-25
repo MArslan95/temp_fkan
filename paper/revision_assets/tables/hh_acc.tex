@@ -1,0 +1,87 @@
+\begin{table}[!hbt]
+    \centering
+    \caption{Historical single-run within-scene results. Classwise and overall classification performance (\%) on HH dataset.}
+    
+    \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c} \hline 
+        \textbf{Class} & \textbf{HViT} &\textbf{SSF} &\textbf{SSFTTKAN}  &\textbf{HybridKAN}  & \textbf{DF} & \textbf{SSMM} & \textbf{MHM}  & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+        Red roof  & 98.14 & 98.06 & 91.86 & 95.86 & \textcolor{orange}{\textbf{98.58}} & \textcolor{red}{\textbf{98.40}} & 97.08 & 93.35 & \textcolor{teal}{\textbf{98.67}} \\ 
+        Road  & \textcolor{teal}{\textbf{95.50}} & 90.57 & \textcolor{red}{\textbf{90.98}} & \textcolor{orange}{\textbf{93.54}}  & 78.17 & 82.09 & 62.85 & 74.56 & 81.87 \\ 
+        Bare soil  & 94.10 & 96.75 & 93.98 & \textcolor{orange}{\textbf{98.01}} & 92.63 & \textcolor{red}{\textbf{97.34}} & 94.28 & 84.11 & \textcolor{teal}{\textbf{99.48}} \\ 
+        Cotton  & \textcolor{red}{\textbf{99.73}} & 99.64 & 97.59 & \textcolor{orange}{\textbf{99.76}}  & 99.00 & 99.72 & 98.91 & 98.10 & \textcolor{teal}{\textbf{99.84}} \\ 
+        Cotton firewood  & 89.49 & 78.25 & \textcolor{teal}{\textbf{98.58}} & 92.24 & 77.05 & 90.27 & \textcolor{red}{\textbf{94.08}} & 68.29 & \textcolor{orange}{\textbf{96.55}} \\ 
+        Rape   & 98.14 & 97.92 & \textcolor{teal}{\textbf{99.70}} & \textcolor{red}{\textbf{98.49}} & 97.22 & 97.92 & 96.86 & 98.28 & \textcolor{orange}{\textbf{99.13}} \\ 
+        Chinese cabbage   & \textcolor{orange}{\textbf{96.57}} & 93.87 & \textcolor{red}{\textbf{96.40}} & 94.35  & 94.35 & 92.21 & 92.01 & 80.17 & \textcolor{teal}{\textbf{99.17}} \\ 
+        Pakchoi    & 81.20 & 70.97 & \textcolor{teal}{\textbf{96.38}} & 75.11  & 65.66 & \textcolor{red}{\textbf{84.46}} & 65.25 & 58.89 & \textcolor{orange}{\textbf{87.33}} \\ 
+        Cabbage   & \textcolor{teal}{\textbf{99.21}} & 97.57 & 98.22 & 97.43  & 96.62 & \textcolor{orange}{\textbf{98.63}} & 95.84 & 93.78 & \textcolor{red}{\textbf{98.30}} \\ 
+        Tuber mustard  & 89.89 & 87.01 & \textcolor{red}{\textbf{93.07}} & \textcolor{orange}{\textbf{95.51}} & 85.06 & 92.77 & 85.34 & 75.42 & \textcolor{teal}{\textbf{98.01}} \\ 
+        Brassica parachinensis & \textcolor{red}{\textbf{91.11}} & 89.00 & \textcolor{orange}{\textbf{95.53}} &  90.59 & 83.32 & 84.38 & 88.99 & 75.06 & \textcolor{teal}{\textbf{98.05}} \\ 
+        Brassica chinensis     & 85.17 & 84.84 & \textcolor{orange}{\textbf{93.95}} &  \textcolor{red}{\textbf{89.16}} & 77.80 & 88.39 & 81.54 & 69.81 & \textcolor{teal}{\textbf{97.40}} \\ 
+        Small Brassica chinensis  & 92.90 & 90.20 & \textcolor{teal}{\textbf{98.46}} & 93.14  & 87.23 & \textcolor{red}{\textbf{93.30}} & 83.79 & 76.36 & \textcolor{orange}{\textbf{98.43}} \\ 
+        Lactuca sativa   & \textcolor{red}{\textbf{94.75}} & 93.09 & \textcolor{teal}{\textbf{98.61}} & 93.71 & 90.21 & 93.56 & 89.54 & 73.32 & \textcolor{orange}{\textbf{96.22}} \\ 
+        Celtuce    & 89.80 & 86.03 &\textcolor{teal}{\textbf{97.22}} &\textcolor{red}{\textbf{93.34}}  & 87.58 & 91.01 & 80.37 & 42.68 & \textcolor{orange}{\textbf{95.34}}\\ 
+        Film covered lettuce   & 94.53 & \textcolor{orange}{\textbf{ 99.34}} & \textcolor{red}{\textbf{99.20}} & 99.12 & 95.25 & 97.12 & 96.22 & 92.54 & \textcolor{teal}{\textbf{99.83}} \\ 
+        Romaine lettuce     & 98.11 & 89.36 & \textcolor{orange}{\textbf{98.44}} & \textcolor{red}{\textbf{98.00}}  & 91.91 & 96.30 & 95.97 & 80.80 & \textcolor{teal}{\textbf{99.70}} \\ 
+        Carrot   & 95.09 & \textcolor{orange}{\textbf{97.37}} & \textcolor{teal}{\textbf{98.79}} & 86.73 & 91.46 &96.68 & 95.75 & 82.38 & \textcolor{red}{\textbf{96.75}} \\ 
+        White radish     & \textcolor{orange}{\textbf{94.69}} &  \textcolor{red}{\textbf{94.59}} & 94.14 & 92.22 & 92.43 & 92.50 & 90.74 & 87.27 & \textcolor{teal}{\textbf{97.23}} \\ 
+        Garlic sprout   & \textcolor{red}{\textbf{93.97}} & 88.36 & \textcolor{teal}{\textbf{98.72}} & 87.02  & 74.94 & 91.32 & 86.03 & 75.67 & \textcolor{orange}{\textbf{96.20}} \\ 
+        Broad bean       & \textcolor{orange}{\textbf{78.82}} & 58.99 & \textcolor{teal}{\textbf{97.07}} & 70.96  & 77.32 & 74.30 & 61.58 & 25.69 & \textcolor{red}{\textbf{78.32}} \\ 
+        Tree   & 96.36 & \textcolor{red}{\textbf{97.02}} & \textcolor{teal}{\textbf{99.72}} & 95.32 & 86.60 & 95.40 & \textcolor{orange}{\textbf{97.41}} & 84.70 & 89.13 \\ \hline
+        
+        \textbf{OA (\%)}       & 96.72 & 95.83 & \textcolor{orange}{\textbf{97.09}} & \textcolor{red}{\textbf{96.81}}  & 94.15 & 96.45 & 94.30 & 89.69 & \textcolor{teal}{\textbf{98.63}} \\ 
+        \textbf{AA (\%)}   &\textcolor{red}{\textbf{93.06}} & 89.95 & \textcolor{teal}{\textbf{96.66}}  & 92.26   & 87.29 & 92.19 & 87.75 & 76.87 & \textcolor{orange}{\textbf{95.50}} \\ 
+        \textbf{$\kappa$}      & 95.86 & 94.72 & \textcolor{orange}{\textbf{96.34}} & \textcolor{red}{\textbf{95.97}} & 92.61 & 95.52 & 92.81 & 87.00 & \textcolor{teal}{\textbf{98.27}} \\ \hline
+        
+        \textbf{Param}    & \num{915158} &\num{2822550}  &\num {15063003} &\num{199547} & \num{224694} & \num{25052} & \num{23734} & \num{26710} & \num{37930} \\ \hline 
+        % \textbf{Time (s)}   & 828 & 846 & 890 & \num{5128} & \num{3466} & \num{10598} & \num{2407} \\ \hline
+    \end{tabular}}
+    \label{tab:HH}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+
+% \begin{table}[!hbt]
+%     \centering
+%     \caption{Classwise and overall classification performance (\%) on HH dataset.}
+    
+%     \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c} \hline 
+%         \textbf{Class} & \textbf{HViT} &\textbf{SSFTTKAN}  &\textbf{HybridKAN} & \textbf{SSViT} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM}  & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+%         Red roof   & 98.14 & 91.86 & 95.86 &\textcolor{teal}{\textbf{99.23}} & \textcolor{red}{\textbf{98.58}} & 98.40 & 97.08 & 93.35 & \textcolor{orange}{\textbf{98.67}} \\ 
+%         Road  & \textcolor{teal}{\textbf{95.50}} & \textcolor{red}{\textbf{90.98}} & \textcolor{orange}{\textbf{93.54}} &83.58 & 78.17 & 82.09 & 62.85 & 74.56 & 81.87 \\ 
+%         Bare soil  & 94.10 & 93.98 & \textcolor{orange}{\textbf{98.01}} & 96.35 & 92.63 & \textcolor{red}{\textbf{97.34}} & 94.28 & 84.11 & \textcolor{teal}{\textbf{99.48}} \\ 
+%         Cotton  & 99.73 & 97.59 & \textcolor{red}{\textbf{99.76}} & \textcolor{orange}{\textbf{99.83}} & 99.00 & 99.72 & 98.91 & 98.10 & \textcolor{teal}{\textbf{99.84}} \\ 
+%         Cotton firewood  & 89.49 & \textcolor{teal}{\textbf{98.58}} & 92.24 & 80.84 & 77.05 & 90.27 & \textcolor{red}{\textbf{94.08}} & 68.29 & \textcolor{orange}{\textbf{96.55}} \\ 
+%         Rape   & 98.14 & \textcolor{teal}{\textbf{99.70}} & \textcolor{red}{\textbf{98.49}} & 97.61 & 97.22 & 97.92 & 96.86 & 98.28 & \textcolor{orange}{\textbf{99.13}} \\ 
+%         Chinese cabbage   & \textcolor{orange}{\textbf{96.57}}& \textcolor{red}{\textbf{96.40}} & 94.35 & 95.38 & 94.35 & 92.21 & 92.01 & 80.17 & \textcolor{teal}{\textbf{99.17}} \\ 
+%         Pakchoi    & 81.20 & \textcolor{teal}{\textbf{96.38}} & 75.11 & 75.82 & 65.66 & \textcolor{red}{\textbf{84.46}} & 65.25 & 58.89 & \textcolor{orange}{\textbf{87.33}} \\ 
+%         Cabbage   & \textcolor{teal}{\textbf{99.21}} & 98.22 & 97.43 & \textcolor{orange}{\textbf{98.80}} & 96.62 & \textcolor{red}{\textbf{98.63}} & 95.84 & 93.78 & 98.30 \\ 
+%         Tuber mustard  & 89.89 & 93.07 & \textcolor{orange}{\textbf{95.51}} & \textcolor{red}{\textbf{94.07}} & 85.06 & 92.77 & 85.34 & 75.42 & \textcolor{teal}{\textbf{98.01}} \\ 
+%         Brassica parachinensis & 91.11 & \textcolor{orange}{\textbf{95.53}} &  90.59 &\textcolor{red}{\textbf{92.73}} & 83.32 & 84.38 & 88.99 & 75.06 & \textcolor{teal}{\textbf{98.05}} \\ 
+%         Brassica chinensis     & 85.17 & \textcolor{red}{\textbf{93.95}} & 89.16 & \textcolor{red}{\textbf{92.96}} & 77.80 & 88.39 & 81.54 & 69.81 & \textcolor{teal}{\textbf{97.40}} \\ 
+%         Small Brassica chinensis  & 92.90 & \textcolor{teal}{\textbf{98.46}} & 93.14  & 92.62 & 87.23 & \textcolor{red}{\textbf{93.30}} & 83.79 & 76.36 & \textcolor{orange}{\textbf{98.43}} \\ 
+%         Lactuca sativa   & \textcolor{red}{\textbf{94.75}} & \textcolor{teal}{\textbf{98.61}} & 93.71 & 93.29 & 90.21 & 93.56 & 89.54 & 73.32 & \textcolor{orange}{\textbf{96.22}} \\ 
+%         Celtuce    & 89.80 &\textcolor{teal}{\textbf{97.22}} & 93.34 &\textcolor{orange}{\textbf{95.45}} & 87.58 & 91.01 & 80.37 & 42.68 & \textcolor{red}{\textbf{95.34}}\\ 
+%         Film covered lettuce   & 94.53 & \textcolor{orange}{\textbf{99.20}} & \textcolor{red}{\textbf{99.12}} & 95.14 & 95.25 & 97.12 & 96.22 & 92.54 & \textcolor{teal}{\textbf{99.83}} \\ 
+%         Romaine lettuce     & 98.11 & \textcolor{orange}{\textbf{98.44}} & \textcolor{red}{\textbf{98.00}} & 96.12 & 91.91 & 96.30 & 95.97 & 80.80 & \textcolor{teal}{\textbf{99.70}} \\ 
+%         Carrot   & 95.09 & \textcolor{teal}{\textbf{98.79}} & 86.73 & 91.95 & 91.46 & \textcolor{red}{\textbf{96.68}} & 95.75 & 82.38 & \textcolor{orange}{\textbf{96.75}} \\ 
+%         White radish     & \textcolor{orange}{\textbf{94.69}} & \textcolor{red}{\textbf{94.14}} & 92.22 &94.13 & 92.43 & 92.50 & 90.74 & 87.27 & \textcolor{teal}{\textbf{97.23}} \\ 
+%         Garlic sprout   & \textcolor{red}{\textbf{93.97}} & \textcolor{teal}{\textbf{98.72}} & 87.02 & 92.50 & 74.94 & 91.32 & 86.03 & 75.67 & \textcolor{orange}{\textbf{96.20}} \\ 
+%         Broad bean       & \textcolor{orange}{\textbf{78.82}} & \textcolor{teal}{\textbf{97.07}} & 70.96  & 76.73 & 77.32 & 74.30 & 61.58 & 25.69 & \textcolor{red}{\textbf{78.32}} \\ 
+%         Tree   & \textcolor{red}{\textbf{96.36}} & \textcolor{teal}{\textbf{99.72}} & 95.32 & 94.38 & 86.60 & 95.40 & \textcolor{orange}{\textbf{97.41}} & 84.70 & 89.13 \\ \hline
+        
+%         \textbf{OA (\%)}       & 96.72 & \textcolor{orange}{\textbf{97.09}} & \textcolor{red}{\textbf{96.81}} & 96.73 & 94.15 & 96.45 & 94.30 & 89.69 & \textcolor{teal}{\textbf{98.63}} \\ 
+%         \textbf{AA (\%)}   &\textcolor{red}{\textbf{93.06}} & \textcolor{teal}{\textbf{96.66}}  & 92.26 & 92.25  & 87.29 & 92.19 & 87.75 & 76.87 & \textcolor{orange}{\textbf{95.50}} \\ 
+%         \textbf{$\kappa$}      &95.86 & \textcolor{orange}{\textbf{96.34}} & \textcolor{red}{\textbf{95.97}} & 95.86  & 92.61 & 95.52 & 92.81 & 87.00 & \textcolor{teal}{\textbf{98.27}} \\ \hline
+        
+%         \textbf{Param}    & \num{915158}  &\num {15063003} &\num{199547} &\num{915158} & \num{224694} & \num{25052} & \num{23734} & \num{26710} & \num{37930} \\ \hline 
+%         % \textbf{Time (s)}   & 828 & 846 & 890 & \num{5128} & \num{3466} & \num{10598} & \num{2407} \\ \hline
+%     \end{tabular}}
+%     \label{tab:HH}
+% \end{table}

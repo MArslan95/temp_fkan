@@ -1,0 +1,22 @@
+\begin{table}[!hbt]
+    \centering
+    \caption{Historical single-run within-scene results. Classwise and overall classification performance (\%) on QUH dataset.}
+    
+    \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c} \hline
+        \textbf{Class} &\textbf{HViT}  & \textbf{SSF} & \textbf{SSFTTKAN} & \textbf{HybridKAN} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\  \hline
+        Trees   & \textcolor{red}{\textbf{97.84}} & 96.94 & 97.51 & 97.43  & 96.63 & 95.98 & 96.51 & \textcolor{orange}{\textbf{97.85}} & \textcolor{teal}{\textbf{98.89}} \\ 
+        Concrete building   &  \textcolor{red}{\textbf{98.86}} & 97.15 &\textcolor{teal}{\textbf{98.96}} & 96.37 & 98.03 & 95.17 & 96.68 & 97.20 & \textcolor{red}{\textbf{98.86}}\\ 
+        Car  & \textcolor{red}{\textbf{84.99}} & 76.76 & \textcolor{teal}{\textbf{91.94}} & 71.74 & 83.06 & 47.31 & 64.11 & 57.58 & \textcolor{orange}{\textbf{87.59}} \\ 
+        Ironhide building  & 99.39 & \textcolor{red}{\textbf{ 99.54}} & 99.47 & 99.14& \textcolor{teal}{\textbf{99.87}} & 97.59 & 97.25 & 99.05 & \textcolor{orange}{\textbf{99.82}} \\ 
+        Plastic playground  & \textcolor{red}{\textbf{98.60}} &  \textcolor{orange}{\textbf{98.61}} & 96.87 & 97.45 & 97.76 & 95.76 & 97.44 & 95.78 & \textcolor{teal}{\textbf{98.72}} \\ 
+        Asphalt road  & \textcolor{teal}{\textbf{97.95}} &  \textcolor{red}{\textbf{97.49}} & 94.60 & 96.37  & 94.91 & 93.30 & 94.87 & 94.46 & \textcolor{orange}{\textbf{97.71 }} \\\hline
+        
+        \textbf{OA (\%)} & \textcolor{orange}{\textbf{98.07}} & \textcolor{red}{\textbf{ 97.24}} & 96.79 & 96.60 & 96.53 & 94.37 & 95.86 & 95.78 & \textcolor{teal}{\textbf{98.37}} \\ 
+        \textbf{AA (\%)} & \textcolor{red}{\textbf{96.27}} & 94.42 &  \textcolor{orange}{\textbf{96.56}} & 93.08  & 95.04 & 87.52 & 91.15 & 90.32 & \textcolor{teal}{\textbf{96.93}} \\ 
+        \textbf{$\kappa$} & \textcolor{orange}{\textbf{97.44}}&  \textcolor{red}{\textbf{96.35}} & 95.79 & 95.49 & 95.41 & 92.54 & 94.51 & 94.40 & \textcolor{teal}{\textbf{97.85}} \\ \hline
+        
+        \textbf{Param} & \num{911046} &\num{2818438} & \num{15061963} & \num{194923} & \num{224166} & \num{22988} & \num{21670} & \num{24646} & \num{36890} \\ \hline
+        % \textbf{Time (s)}  & \num{2084} & \num{2049} & \num{2242} & \num{5093} & \num{8582} & \num{24973} & \num{11386} \\ \hline
+    \end{tabular}}
+    \label{tab:QUH}
+\end{table}

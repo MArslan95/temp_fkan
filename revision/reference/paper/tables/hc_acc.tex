@@ -1,0 +1,73 @@
+\begin{table}[ht]
+    \centering
+    \caption{Class-wise and overall classification performance (\%) on HC dataset}
+    \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c}
+    \hline
+        \textbf{Class}  & \textbf{HViT} &\textbf{SSF} &\textbf{SSFTTKAN} &\textbf{HybridKAN} &\textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+        Strawberry      & 97.65 & 97.51 & 95.17 &\textcolor{orange}{\textbf{98.16}} & 94.03 & 97.25 & \textcolor{red}{\textbf{97.81}} & 96.86  & \textcolor{teal}{\textbf{99.45}} \\ 
+        Cowpea          & \textcolor{orange}{\textbf{96.32}} & 95.59 & 95.65 & \textcolor{red}{\textbf{95.75}} & 92.38 & 93.54 & 93.89 & 95.63  & \textcolor{teal}{\textbf{96.67}} \\ 
+        Soybean         & 94.37 & 93.33 & 95.92 & 78.99 & 85.02 & \textcolor{orange}{\textbf{96.15}} & \textcolor{red}{\textbf{94.88}} & 90.01  & \textcolor{teal}{\textbf{99.14}} \\ 
+        Sorghum         & \textcolor{teal}{\textbf{99.64}} & 98.83 & 96.07 & 87.83 & \textcolor{red}{\textbf{98.96}} & 98.19 & \textcolor{orange}{\textbf{99.08}} & 96.80  & 97.88 \\ 
+        Water spinach   & 90.00 & 77.77 & \textcolor{teal}{\textbf{99.90}} & 84.35  & 87.87 & 73.79 & \textcolor{orange}{\textbf{97.87}} & 86.29  & \textcolor{red}{\textbf{93.33}} \\ 
+        Watermelon      & \textcolor{red}{\textbf{84.77}} & 75.75 & \textcolor{orange}{\textbf{92.25}}  & 59.21  & 72.89 & 73.08 & 76.81 & 60.80  & \textcolor{teal}{\textbf{95.44}} \\ 
+        Greens          & 94.78 & 94.52 & \textcolor{teal}{\textbf{98.98}} & 91.34  & \textcolor{red}{\textbf{94.80}} & 87.46 & 95.84 & 79.57  & \textcolor{orange}{\textbf{97.60}} \\ 
+        Trees           &\textcolor{red}{\textbf{92.97}} & 89.06  & \textcolor{orange}{\textbf{96.37}}  & 84.61  & 80.03 & 89.44 & 91.53 & 87.49 & \textcolor{teal}{\textbf{98.18}} \\ 
+        Grass           & \textcolor{red}{\textbf{95.62}} & 92.83 & \textcolor{teal}{\textbf{98.65}} & 84.82 & 88.37 & 91.85 & 93.01 & 84.36  & \textcolor{orange}{\textbf{96.55}} \\ 
+        Red roof        & \textcolor{orange}{\textbf{98.17}} & 97.08 & 88.98 & 84.63  & 96.17 & 94.18 & 95.38 &\textcolor{red}{\textbf{97.17}} &\textcolor{teal}{\textbf{99.48}} \\ 
+        Gray roof       & \textcolor{red}{\textbf{96.87}} & 96.08 & 94.73 & 93.50 & 93.48 & 96.28 & \textcolor{orange}{\textbf{97.02}} & 92.22 & \textcolor{teal}{\textbf{99.54}} \\ 
+        Plastic         & 89.79 & 83.17 &\textcolor{teal}{\textbf{94.86}}  & 92.11  & 70.55 & 75.98 & \textcolor{red}{\textbf{90.51}} & 73.30  & \textcolor{orange}{\textbf{93.98}} \\ 
+        Bare soil       & \textcolor{red}{\textbf{86.70}} & 84.06 & \textcolor{orange}{\textbf{93.27}}  & 82.41  & 76.32 & 85.62 & 66.27 & 75.30  & \textcolor{teal}{\textbf{95.12}} \\ 
+        Road            & 95.54 &94.07 & 91.37 & \textcolor{orange}{\textbf{97.37}} & 89.33 & \textcolor{red}{\textbf{96.17}} & 95.09 & 91.74  & \textcolor{teal}{\textbf{98.67}} \\ 
+        Bright object   & 82.28 & 78.66 & \textcolor{orange}{\textbf{96.96}} & 77.29  & 72.21 & \textcolor{red}{\textbf{83.65}} & 83.26 & 55.67  & \textcolor{teal}{\textbf{98.14}} \\ 
+        Water           & 99.57 &99.32 & 94.86 & 99.19  & 99.64 & \textcolor{orange}{\textbf{99.69}} & \textcolor{red}{\textbf{99.64}} & 99.53  & \textcolor{teal}{\textbf{99.78}} \\ \hline
+        
+        \textbf{OA (\%)}  & \textcolor{orange}{\textbf{96.52}} &\textcolor{red}{\textbf{95.30}} & 94.82 & 93.27  & 92.35 & 95.07 & 95.25 & 93.12  &\textcolor{teal}{\textbf{98.63}} \\ 
+        \textbf{AA (\%)}  &\textcolor{red}{\textbf{93.44}} & 90.48 & \textcolor{orange}{\textbf{95.25}} & 86.97  & 87.00 & 89.52 & 91.74 & 85.17  &\textcolor{teal}{\textbf{97.43}} \\ 
+        \textbf{$\kappa$}  & \textcolor{orange}{\textbf{95.93}} & \textcolor{red}{\textbf{94.50}} & 93.99 & 92.12 & 91.06 & 94.23 & 94.44 & 91.95  &\textcolor{teal}{\textbf{98.40}} \\ \hline
+        \textbf{Param}    & \num{913616} &\num{2821008} & \num{15062609}  & \num{197813} & \num{224496} & \num{24278} & \num{22960} & \num{25936} & \num{37540} \\ \hline
+        % \textbf{Time (s)}      & 551 & 315 & 573 & 2,502 & 2,262 & 7,362 & 1,613 \\ \hline
+        \end{tabular}}
+        \label{tab:HC}
+\end{table}
+
+
+
+
+
+
+
+
+
+% \begin{table}[ht]
+%     \centering
+%     \caption{Class-wise and overall classification performance (\%) on HC dataset, including aggregate metrics and \textbf{Param} indicates the number of
+% trainable parameters.}
+%     \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c}
+%     \hline
+%         \textbf{Class}  & \textbf{HViT} &\textbf{SSFTTKAN} &\textbf{HybridKAN} & \textbf{SSViT} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+%         Strawberry      & 97.65 & 95.17 & 98.16 & \textcolor{red}{\textbf{97.68}} & 94.03 & 97.25 & \textcolor{orange}{\textbf{97.81}} & 96.86  & \textcolor{teal}{\textbf{99.45}} \\ 
+%         Cowpea          & \textcolor{orange}{\textbf{96.32}}& 95.65 & 95.75 & \textcolor{red}{\textbf{96.26}} & 92.38 & 93.54 & 93.89 & 95.63  & \textcolor{teal}{\textbf{96.67}} \\ 
+%         Soybean         & 94.37 &95.92 & 78.99& 94.86 & 85.02 & \textcolor{orange}{\textbf{96.15}} & \textcolor{red}{\textbf{94.88}} & 90.01  & \textcolor{teal}{\textbf{99.14}} \\ 
+%         Sorghum         & \textcolor{teal}{\textbf{99.64}} & 96.07 & 87.83 & \textcolor{orange}{\textbf{99.46}} & 98.96 & 98.19 & \textcolor{red}{\textbf{99.08}} & 96.80  & 97.88 \\ 
+%         Water spinach   & 90.00 & \textcolor{teal}{\textbf{99.90}} & 84.35 & 92.96 & 87.87 & 73.79 & \textcolor{orange}{\textbf{97.87}} & 86.29  & \textcolor{red}{\textbf{93.33}} \\ 
+%         Watermelon      & \textcolor{red}{\textbf{84.77}} & \textcolor{orange}{\textbf{92.25}}  & 59.21 & 83.18  & 72.89 & 73.08 & 76.81 & 60.80  & \textcolor{teal}{\textbf{95.44}} \\ 
+%         Greens          & 94.78 & \textcolor{teal}{\textbf{98.98}} & 91.34 & 93.84 & \textcolor{red}{\textbf{94.80}} & 87.46 & 95.84 & 79.57  & \textcolor{orange}{\textbf{97.60}} \\ 
+%         Trees           & 92.97 & \textcolor{orange}{\textbf{96.37}}  & 84.61  & \textcolor{red}{\textbf{93.83}} & 80.03 & 89.44 & 91.53 & 87.49 & \textcolor{teal}{\textbf{98.18}} \\ 
+%         Grass           & \textcolor{red}{\textbf{95.62}} & \textcolor{teal}{\textbf{98.65}} & 84.82 & 95.55 & 88.37 & 91.85 & 93.01 & 84.36  & \textcolor{orange}{\textbf{96.55}} \\ 
+%         Red roof        & \textcolor{orange}{\textbf{98.17}} & 88.98 & 84.63 & \textcolor{red}{\textbf{97.80}} & 96.17 & 94.18 & 95.38 & 97.17  &\textcolor{teal}{\textbf{99.48}} \\ 
+%         Gray roof       & 96.87 & 94.73  & 93.50 & \textcolor{red}{\textbf{96.89}} & 93.48 & 96.28 & \textcolor{orange}{\textbf{97.02}} & 92.22 & \textcolor{teal}{\textbf{99.54}} \\ 
+%         Plastic         & 89.79 & \textcolor{teal}{\textbf{94.86}}  & 92.11 & 88.85 & 70.55 & 75.98 & \textcolor{red}{\textbf{90.51}} & 73.30  & \textcolor{orange}{\textbf{93.98}} \\ 
+%         Bare soil       & 86.70 & \textcolor{orange}{\textbf{93.27}}  & 82.41 & \textcolor{red}{\textbf{86.94}} & 76.32 & 85.62 & 66.27 & 75.30  & \textcolor{teal}{\textbf{95.12}} \\ 
+%         Road            & 95.54 & 91.37 & \textcolor{orange}{\textbf{97.37}} & 95.91 & 89.33 & \textcolor{red}{\textbf{96.17}} & 95.09 & 91.74  & \textcolor{teal}{\textbf{98.67}} \\ 
+%         Bright object   & 82.28 & \textcolor{orange}{\textbf{96.96}} & 77.29 & \textcolor{red}{\textbf{84.34}} & 72.21 & 83.65 & 83.26 & 55.67  & \textcolor{teal}{\textbf{98.14}} \\ 
+%         Water           & 99.57 & 94.86 & 99.19  & 99.53 & 99.64 & \textcolor{orange}{\textbf{99.69}} & \textcolor{red}{\textbf{99.64}} & 99.53  & \textcolor{teal}{\textbf{99.78}} \\ \hline
+        
+%         \textbf{OA (\%)}       & \textcolor{red}{\textbf{96.52}} & 94.82 & 93.27  & \textcolor{orange}{\textbf{96.57}} & 92.35 & 95.07 & 95.25 & 93.12  &\textcolor{teal}{\textbf{98.63}} \\ 
+%         \textbf{AA (\%)}       &93.44 & \textcolor{orange}{\textbf{95.25}} & 86.97  &\textcolor{red}{\textbf{93.62}} & 87.00 & 89.52 & 91.74 & 85.17  &\textcolor{teal}{\textbf{97.43}} \\ 
+%         \textbf{$\kappa$}  & \textcolor{red}{\textbf{95.93}} & 93.99 & 92.12 & \textcolor{orange}{\textbf{95.98}} & 91.06 & 94.23 & 94.44 & 91.95  &\textcolor{teal}{\textbf{98.40}} \\ \hline
+        
+%         \textbf{Param}    & \num{913616} & \num{15062609}  & \num{197813} & \num{913616} & \num{224496} & \num{24278} & \num{22960} & \num{25936} & \num{37540} \\ \hline
+%         % \textbf{Time (s)}      & 551 & 315 & 573 & 2,502 & 2,262 & 7,362 & 1,613 \\ \hline
+%         \end{tabular}}
+%         \label{tab:HC}
+% \end{table}

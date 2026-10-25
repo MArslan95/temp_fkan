@@ -1,0 +1,582 @@
+--- Intial_Submission.tex
++++ highlighted_filled.tex
+@@ -1,15 +1,19 @@
+-\documentclass{ieeeaccess}
++\documentclass{revision_assets/ieeeaccess_revision}
+ \usepackage[T1]{fontenc}
+ \usepackage{mathptmx}
+-\usepackage{newtxtext,newtxmath}
+ \usepackage{cite}
+ \usepackage{amsmath,amssymb}
+ \DeclareMathOperator*{\argmax}{arg\,max}
+ \usepackage{algorithmic}
+ \usepackage{graphicx, multirow, adjustbox, float}
+-% \usepackage{xcolor, soul}
+ \usepackage[table]{xcolor}
+ \usepackage{soul}
++\usepackage{framed}
++\newif\ifrevisionhighlights
++\revisionhighlightstrue
++\definecolor{shadecolor}{RGB}{255,255,160}
++\newenvironment{revision}{\ifrevisionhighlights\begin{shaded*}\fi}{\ifrevisionhighlights\end{shaded*}\fi}
++\newcommand{\pending}[1]{\textcolor{red!70!black}{\textbf{Pending evidence:} #1}}
+ \sethlcolor{yellow}
+ \usepackage{caption, subcaption}
+ \usepackage{siunitx}
+@@ -22,21 +26,20 @@
+ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+ 
+ \begin{document}
+-\history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
+-\doi{00.0000/ACCESS.2026.DOI}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++\history{Working revision draft; experimental evidence pending.}
++\doi{}
+ \title{FKANMamba: FastKAN-Enhanced State Space Learning for Spectral-Spatial Hyperspectral Image Classification}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ \author{\uppercase{Muhammad Arslan}\authorrefmark{1},
+ \uppercase{Jae Hyeon Kim\authorrefmark{1}, Muhammad Hassaan Farooq Butt}\authorrefmark{2}, and Jay Hoon Jung\authorrefmark{1}}
+ \address[1]{Department of Computer Engineering, Korea Aerospace University, Gyeonggi-do 10540,  Republic of Korea (e-mail: arslan@kau.ac.kr)}
+ \address[2]{Faculty of Environmental Sciences and Natural Resource Management (MINA), Norwegian University of Life Sciences (NMBU), 1432 Ås, Norway (e-mail: mubut0522@nmbu.no)}
+ 
+ \corresp{Corresponding author: Jay Hoon Jung (e-mail: jhjung@kau.ac.kr).}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ \begin{abstract}
+-Hyperspectral image classification (HSIC) remains challenging when labeled samples are limited, particularly because different land-cover classes may exhibit similar spectral signatures and appear within heterogeneous local neighborhoods. Vision Transformers (ViTs) can model global token interactions, whereas state-space models (SSMs) offer an efficient way to aggregate long-range sequential context. However, the effectiveness of these models depends on the discriminative quality of the spectral-spatial representations provided to them. In addition, conventional attention mechanisms typically generate query, key, and value features via linear projections, which may limit nonlinear transformations of these features before the attention computation. To tackle these challenges, we introduce FKANMamba, a spectral-spatial HSIC-based framework that integrates Fast Kolmogorov-Arnold Networks (KANs) with SSM for efficient nonlinear representation learning. Given a hyperspectral imaging (HSI) patch, spectral and spatial representations are first obtained through learnable projections. These representations are then enhanced by a FastKAN Enhancement Block (FEB), which uses the center-pixel token as a contextual anchor to generate branch-specific nonlinear channel gates. This design helps reduce noisy and mixed responses from neighboring pixels while preserving class-discriminative information. A Fast Spectral-Spatial Attention (FSSA) module is further introduced to replace conventional linear query, key, and value projections with nonlinear radial basis function mappings, enabling more flexible feature interactions among spectrally similar classes. The enhanced representations are fused and processed by an SSM to capture long-range dependencies. Experiments on five public hyperspectral remote sensing benchmark datasets show that FKANMamba achieves competitive classification performance compared with recent methods, while maintaining favorable parameter efficiency. The code will be made publicly available at \url{https://github.com/KAU-QuantumAILab/FKANMamba}.
++\begin{revision}
++We investigate FKANMamba, a patch-based hyperspectral classifier combining radial-basis-function FastKAN mappings, two-branch attention, and a non-selective affine recurrent state-space aggregator. Independent token projections and context-derived channel gates precede shared nonlinear attention. The model identifier does not imply an implementation of selective Mamba. Historical experiments on five hyperspectral scenes report high within-scene classification accuracy and a compact parameter count relative to the listed Transformer and KAN baselines. Those results use overlapping random-pixel neighborhoods and full-scene PCA; they do not establish spatially independent generalization, repeated-run reliability, or comparative runtime superiority. The revision specifies controlled projection and aggregation ablations, five independently seeded pipeline repetitions, and support-disjoint evaluation on HC and HH. \pending{The new experimental and computational results must be inserted before submission.}
++\end{revision}
+ \end{abstract}
+ \begin{keywords}
+ Hyperspectral image classification (HSIC), Fast Kolmogorov-Arnold Network (KAN), State-space models (SSMs), Spectral-Spatial feature learning
+@@ -59,78 +62,61 @@
+ 
+ To overcome this limitation, we propose FKANMamba, a spectral-spatial HSIC architecture that integrates radial basis function (RBF)-based FastKAN transformations with attention and state-space sequence modeling. Independent learnable projections first generate complementary spectral and spatial token representations from an HSI patch. A FEB then performs nonlinear channel-wise modulation to refine these representations before attention. The FSSA module further replaces conventional linear query, key, and value projections with RBF-based FastKAN mappings to model nonlinear token dependencies. Finally, the resulting attention features are fused and processed by a state-space sequence module to aggregate context before classification.
+ 
+-The main contributions of this work are summarized as follows:
+-\begin{itemize}
+-
+-\item \textbf{FKANMamba Framework:}
+-We propose FKANMamba, a spectral-spatial HSIC framework that integrates RBF-based FastKAN transformations, self-attention, and state-space sequence modeling. Spectral and spatial  token representations are first generated via independent learnable projections, enhanced prior to attention, fused after nonlinear dependency modeling, and then processed by a state-space module for contextual sequence aggregation.
+-
+-\item \textbf{Component-Wise Spectral-Spatial Enhancement:}
+-We introduce the FEB, which performs nonlinear, context-aware modulation of spectral and spatial representations before attention. Independently parameterized FastKAN mappings generate channel-wise weights to emphasize informative spectral-spatial responses and reduce less relevant or noisy features.
+-
+-\item \textbf{FastKAN-Based Nonlinear Attention:}
+-We used the FSSA module, which replaces conventional linear query, key, and value projections with RBF-based FastKAN mappings. By computing attention from nonlinearly transformed spectral and spatial representations, FSSA provides a more flexible mechanism for modeling fine-grained spectral-spatial dependencies before feature fusion.
+-\end{itemize}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++\begin{revision}
++The contribution is an investigated combination of established operators: RBF-based channel gating and query/key/value mappings are integrated with two token views and an affine recurrent aggregator. We provide an explicit account of the implemented tensor operations and qualify the evidence to within-scene classification. Controlled comparisons are required to establish whether the RBF mappings and recurrent readout improve on simpler alternatives; their individual superiority is not established by the historical complete-model results.
++\end{revision}
++
+ \begin{figure*}[!t]
+     \centering
+-    \includegraphics[width=\textwidth]{Fig/FKANMamba.png}
+-    \caption{FKANMamba begins with the extraction of 3D patches from the HSI cube, which are converted into spectral and spatial tokens. FEB uses the center token to adaptively recalibrate the spectral and spatial representations through FastKAN-based channel gating. FSSA then models nonlinear token interactions by generating query, key, and value features using RBF-based FastKAN mappings. The two attention outputs are fused and passed to the state-space module for sequential context aggregation. Finally, normalization and a linear classification layer produce the class prediction.}
++    \includegraphics[width=\textwidth]{revision_assets/figures/architecture.png}
++    \caption{\colorbox{yellow}{Revised operation diagram.} FKANMamba uses two tensor-order token views, independent projections and FEB gates, shared FastKAN attention, indexwise concatenation, and a non-selective affine recurrent aggregator. FEB uses a fixed representative token, not the target-pixel spectrum. A dense softmax classifier reads the final hidden state; no post-recurrence normalization is used.}
+ \label{fig:architecture}
+ \end{figure*}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++\begin{revision}
++\textbf{Working revision status.} Historical tables are retained as single-run within-scene observations. The five-repetition, spatial, controlled-ablation, and profiling studies described in Section~\ref{sec:revision_protocol} are specified but not yet completed. This manuscript is not submission-ready.
++\end{revision}
++
+ \section{Proposed Methodology}
+ 
+ In the HSIC, each pixel is characterized by a spectral signature capturing reflectance across multiple wavelength bands. Let $\mathbf{X}\in\mathbb{R}^{H\times W\times C}$ denote an HSI cube, where $ H$ and $ W$ are the spatial dimensions and $C$ is the number of spectral bands. To reduce spectral redundancy and computational cost, the original spectral dimension is first reduced to $C_r$ components. For each labeled pixel, an overlapping patch $\mathbf{P}_{i,j}\in\mathbb{R}^{p\times p\times C_r}$ is extracted from the reduced HSI cube. Each patch is then converted into token sequences and processed by the proposed FKANMamba model.
+ 
+ FKANMamba consists of four main stages. First, two branch-specific token views are generated from the PCA-reduced HSI patch using different tensor orderings and independent learnable projections. Second, the FEB utilizes nonlinear, channel-wise modulation to enhance the spectral and spatial branch tokens before the attention mechanism. Third, the FSSA module replaces conventional linear query, key, and value projections with RBF-based FastKAN mappings. Finally, the fused attention features are passed to a lightweight recurrent state-space module for sequential context aggregation, followed by a classification layer. Figure~\ref {fig:architecture} describes the proposed architecture.
+-% The overall architecture is illustrated in Figure.~\ref{fig:architecture}.
+ 
+ \subsection{Token Generation}
+-
+-The token generation step converts each PCA-reduced HSI patch into two branch-specific token representations. Given a patch batch
+-$\mathbf{X}\in\mathbb{R}^{B\times p\times p\times C_r}$, where $B$ is the batch size, $p$ is the patch size, and $C_r$ is the number of retained spectral components, the patch is reshaped into token sequences of length $L=p^2$. The spectral branch preserves the standard patch ordering, so that each token corresponds to the reduced spectral response at one spatial position. In the spatial branch, the patch dimensions are reordered before flattening, providing a complementary token view of the same local spectral-spatial region:
++\label{sec:token_details}
++\begin{revision}
++Let $\mathbf X\in\mathbb R^{B\times p\times p\times C_r}$. The implementation constructs $L=p^2$ tokens per branch using
+ \begin{equation}
+ \begin{aligned}
+-\mathbf{F}_{\mathrm{spec}} &=
+-\mathcal{R}_{\mathrm{spec}}(\mathbf{X})
+-\in \mathbb{R}^{B\times L\times C_r}, \\
+-\mathbf{F}_{\mathrm{spa}} &=
+-\mathcal{R}_{\mathrm{spa}}(\mathbf{X})
+-\in \mathbb{R}^{B\times L\times C_r},
++F_{\rm spec}&=\operatorname{reshape}(X,[B,p^2,C_r]),\\
++F_{\rm spa}&=\operatorname{reshape}(\operatorname{transpose}(X,[0,2,3,1]),[B,p^2,C_r]).
+ \end{aligned}
+ \label{eq:patch_tokens}
+ \end{equation}
+-Here, $\mathcal{R}_{\mathrm{spec}}(\cdot)$ and $\mathcal{R}_{\mathrm{spa}}(\cdot)$ denote the branch-specific rearrangement and flattening operations.
+-
+-The two token sequences are then projected independently into a shared embedding dimension:
++These are different memory-order views, not two pixel-aligned sequences. With zero-based token index $t$ and feature index $j$, put $q=tC_r+j$. Then
+ \begin{equation}
+ \begin{aligned}
+-\mathbf{S}_{\mathrm{spa}} &=
+-\mathbf{F}_{\mathrm{spa}}\mathbf{W}_{\mathrm{spa}}
+-+
+-\mathbf{b}_{\mathrm{spa}},
+-\qquad
+-\mathbf{S}_{\mathrm{spa}}\in\mathbb{R}^{B\times L\times d}, \\
+-\mathbf{S}_{\mathrm{spec}} &=
+-\mathbf{F}_{\mathrm{spec}}\mathbf{W}_{\mathrm{spec}}
+-+
+-\mathbf{b}_{\mathrm{spec}},
+-\qquad
+-\mathbf{S}_{\mathrm{spec}}\in\mathbb{R}^{B\times L\times d}.
++F_{\rm spec}[b,t,j]&=X[b,\lfloor t/p\rfloor,t\bmod p,j],\\
++F_{\rm spa}[b,t,j]&=X[b,q\bmod p,\lfloor q/(C_rp)\rfloor,\lfloor q/p\rfloor\bmod C_r].
+ \end{aligned}
++\end{equation}
++The latter groups entries from multiple spatial rows and PCA components. Each sequence is projected through its own biased dense map from $C_r=15$ to $d=32$. The projections do not share weights. At fusion, equal sequence indices are concatenated along the channel axis; equal indices do not imply a common physical pixel. Thus the branches are complementary tensor views, and no pixelwise alignment claim is made.
++\begin{equation}
++S_{\rm spa}=F_{\rm spa}W_{\rm spa}+b_{\rm spa},\qquad
++S_{\rm spec}=F_{\rm spec}W_{\rm spec}+b_{\rm spec}.
+ \label{eq:tokens}
+ \end{equation}
+-where $\mathbf{W}_{\mathrm{spa}},\mathbf{W}_{\mathrm{spec}}\in\mathbb{R}^{C_r\times d}$ and
+-$\mathbf{b}_{\mathrm{spa}},\mathbf{b}_{\mathrm{spec}}\in\mathbb{R}^{d}$ are learnable projection parameters. The resulting embeddings preserve the same sequence length but are independently parameterized, allowing the subsequent FEB and FSSA modules to process complementary views of the local HSI patch.
+-
++\end{revision}
+ \subsection{Fast Kolmogorov-Arnold Network}
+ \label{sec:fastkan}
++\begin{revision}
++All implemented FastKAN maps use eight Gaussian RBF centers initialized uniformly over $[-1,1]$, with fixed initial spacing $2/7$ in the denominator. The centers themselves are trainable; the initial interval is not a constraint on their subsequent values. Feature-axis LayerNorm precedes the basis expansion. The optional base-update branch is disabled. Spline projection weights use Glorot-uniform initialization and an L2 penalty of 0.001; the constructor's spline initialization-scale argument does not control the active initializer.
++\end{revision}
++
+ 
+ KANs parameterize nonlinear transformations through learnable basis-function mappings. Standard KAN implementations commonly use B-spline bases, but spline evaluation and grid adaptation can increase computational costs. FastKAN \cite{ref29} provides a lighter alternative by using Gaussian RBF expansions. In FKANMamba, this FastKAN formulation is used for channel-gate generation in FEB and for nonlinear query, key, and value construction in FSSA.
+ 
+ Let $\mathbf{Z}\in\mathbb{R}^{B\times L\times d_{\mathrm{in}}}$ denote an input token sequence. The input representation is first normalized across the feature dimension:
+-% Layer normalization is first applied along the feature dimension:
+ \begin{equation}
+ \widetilde{\mathbf{Z}}
+ =
+@@ -184,9 +170,12 @@
+ \label{eq:fastkan_output}
+ \end{equation}
+ where $\mathbf{Y}\in\mathbb{R}^{B\times L\times d_{\mathrm{out}}}$. Thus, the FastKAN layer provides localized nonlinear feature responses via an RBF expansion, followed by a compact, learnable projection.
+-% For fixed input and output dimensions, its computation scales linearly with the sequence length $L$ and the number of RBF centers $M$.
+ 
+ \subsection{FastKAN Enhancement Block}
++\begin{revision}
++FEB selects zero-based index $l_r=p/2=6$ from $S_{\rm spa}$ for the $12\times12$ setting. The target pixel lies at patch coordinate $(6,6)$ under offsets $-6,\ldots,+5$; its row-major pixel-token index would be 78. The selected transposed-branch token is not that pixel's spectrum. We therefore call it a fixed representative token. Independent FastKAN maps followed by sigmoid generate the two channel gates, which are broadcast over token positions. This description preserves the inspected local computation; identity with the historical run configuration requires verification.
++\end{revision}
++
+ \label{sec:feb}
+ 
+ The FEB refines the spectral and spatial branch tokens through adaptive channel-wise modulation before attention. Let
+@@ -239,6 +228,10 @@
+ $\widetilde{\mathbf{S}}_{\mathrm{spa}},\widetilde{\mathbf{S}}_{\mathrm{spec}}\in\mathbb{R}^{B\times L\times d}$. Since the gates are channel-wise, the same modulation vector is shared across all token positions within each patch.
+ 
+ \subsection{FastKAN Spectral-Spatial Attention}
++\begin{revision}
++The same FSSA layer instance is applied to both branches, so its query, key, value, and output-projection weights are shared across branches. The Q, K, and V mappings are mutually distinct. Each produces 32 channels, divided into eight heads of width four; the biased output projection also produces 32 channels. Attention-weight dropout is 0.7 during training. Concatenation therefore gives a fused width of 64.
++\end{revision}
++
+ \label{sec:fssa}
+ 
+ After feature enhancement, FSSA models token-level dependencies within each branch. Conventional multi-head self-attention constructs query, key, and value tensors through linear projections. In FSSA, these projections are replaced with RBF-based FastKAN mappings, enabling nonlinear feature transformations prior to attention computation.
+@@ -295,7 +288,6 @@
+ \mathbf{V}^{(r)}_{m}.
+ \label{eq:fssa_head_output}
+ \end{equation}
+-% The outputs from all heads are concatenated and projected:
+ The representations from all attention heads are aggregated and mapped as:
+ \begin{equation}
+ \widehat{\mathbf{O}}^{(r)}
+@@ -326,202 +318,96 @@
+ \end{equation}
+ The fused representation combines the two branch-wise attention outputs and is passed to the recurrent state-space module.
+ 
+-\subsection{Recurrent State-Space Module}
++\subsection{Non-Selective Affine Recurrent State-Space Aggregator}
+ \label{sec:ssm}
+-
+-To aggregate contextual information along the fused token sequence, FKANMamba uses a lightweight recurrent state-space scan. Let
+-$\mathbf{O}\in\mathbb{R}^{B\times L\times d_f}$ denote the fused FSSA output, where $d_f=2d_{\mathrm{out}}$. The token at position $t$ is denoted as
+-$\mathbf{o}_{t}=\mathbf{O}[:,t,:]\in\mathbb{R}^{B\times d_f}$.
+-
+-A hidden state $\mathbf{h}_{t}\in\mathbb{R}^{B\times d_s}$ is updated sequentially as
+-\begin{equation}
+-\mathbf{h}_{t}
+-=
+-f_{\mathrm{trans}}(\mathbf{h}_{t-1})
+-+
+-f_{\mathrm{update}}(\mathbf{o}_{t}),
+-\qquad
+-\mathbf{h}_{0}=\mathbf{0},
+-\quad
+-t=1,\ldots,L,
+-\label{eq:ssm_update_general}
+-\end{equation}
+-where $f_{\mathrm{trans}}(\cdot)$ and $f_{\mathrm{update}}(\cdot)$ are learnable dense transformations. Equivalently, this can be written as
+-\begin{equation}
+-\mathbf{h}_{t}
+-=
+-\mathbf{h}_{t-1}\mathbf{W}_{\mathrm{trans}}
+-+
+-\mathbf{o}_{t}\mathbf{W}_{\mathrm{update}}
+-+ \mathbf{b}_{\mathrm{trans}}
+-+
+-\mathbf{b}_{\mathrm{update}}
++\begin{revision}
++The submitted recurrent module is an affine linear recurrent network with hidden width $d_s=64$. It scans fused indices $t=0,\ldots,143$ in their constructed order, starts at zero, and uses the final hidden state for classification:
++\begin{equation}
++h_{t+1}=h_tW_{\rm trans}+O_tW_{\rm update}+b_{\rm trans}+b_{\rm update},\qquad h_0=0.
+ \label{eq:ssm_update}
+ \end{equation}
+-This recurrence scans the token sequence once and scales linearly with $L$. The final hidden state $\mathbf{h}_{L}$ is used as the sequence-level representation and is passed directly to the classifier:
+-\begin{equation}
+-\widehat{\mathbf{y}}
+-=
+-\operatorname{softmax}
+-\left(
+-\mathbf{h}_{L}\mathbf{W}_{\mathrm{cls}}
+-+
+-\mathbf{b}_{\mathrm{cls}}
+-\right),
++Both dense maps include biases. Their parameters are learned but shared over positions, with no recurrent activation, input-dependent selection, or Mamba-specific discretization. Consequently this is a non-selective affine state-space aggregator, not an implementation of selective Mamba. FKANMamba is retained as the framework identifier. The classifier is a biased dense softmax applied directly to $h_L$; the separately declared dense/dropout members are unused in the forward pass. No normalization is applied between this hidden state and the classifier.
++\begin{equation}
++\widehat y=\operatorname{softmax}(h_LW_{\rm cls}+b_{\rm cls}).
+ \label{eq:ssm_softmax}
+ \end{equation}
+-where $\mathbf{W}_{\mathrm{cls}}\in\mathbb{R}^{d_s\times N_c}$ and
+-$\mathbf{b}_{\mathrm{cls}}\in\mathbb{R}^{N_c}$ are classifier parameters, and $N_c$ is the number of target classes. The classification loss is defined using cross-entropy as
+-\begin{equation}
+-\mathcal{L}
+-=
+--\frac{1}{B}
+-\sum_{b=1}^{B}
+-\sum_{i=1}^{N_c}
+-y_{b,i}
+-\log
+-\left(
+-\widehat{y}_{b,i}
+-\right),
+-\label{eq:ce_loss}
+-\end{equation}
+-where $B$ denotes the batch size and ${N_c}$ is the number of classes. The term $y_{b,i}\in\{0,1\}$ represents the one-hot ground-truth label of sample $b$ for class $i$, and $\widehat{y}_{b,i}$ denotes the corresponding predicted probability.
+-% ######### SSM Ends Here#######
+-\subsection{Recurrent State-Space Module}
+-\label{sec:ssm}
+-
+-To aggregate contextual information along the fused token sequence, FKANMamba uses a lightweight recurrent state-space scan. Let
+-$\mathbf{O}\in\mathbb{R}^{B\times L\times d_f}$ denote the fused FSSA output, where $d_f=2d_{\mathrm{out}}$. The token at position $t$ is denoted as
+-$\mathbf{o}_{t}=\mathbf{O}[:,t,:]\in\mathbb{R}^{B\times d_f}$.
+-
+-A hidden state $\mathbf{h}_{t}\in\mathbb{R}^{B\times d_s}$ is updated sequentially as
+-\begin{equation}
+-\mathbf{h}_{t}
+-=
+-f_{\mathrm{trans}}(\mathbf{h}_{t-1})
+-+
+-f_{\mathrm{update}}(\mathbf{o}_{t}),
+-\qquad
+-\mathbf{h}_{0}=\mathbf{0},
+-\quad
+-t=1,\ldots,L,
+-\label{eq:ssm_update_general}
+-\end{equation}
+-where $f_{\mathrm{trans}}(\cdot)$ and $f_{\mathrm{update}}(\cdot)$ are learnable dense transformations. Equivalently, this can be written as
+-\begin{equation}
+-\mathbf{h}_{t}
+-=
+-\mathbf{h}_{t-1}\mathbf{W}_{\mathrm{trans}}
+-+
+-\mathbf{o}_{t}\mathbf{W}_{\mathrm{update}}
+-+
+-\mathbf{b}_{\mathrm{trans}}
+-+
+-\mathbf{b}_{\mathrm{update}}.
+-\label{eq:ssm_update}
+-\end{equation}
+-
+-% --- ADDED FOR REVIEWER 1 COMMENT 2 ---
+-The recurrence in Eq.~\eqref{eq:ssm_update} matches the implemented state update. The matrices $\mathbf{W}_{\mathrm{trans}}\in\mathbb{R}^{d_s\times d_s}$ and $\mathbf{W}_{\mathrm{update}}\in\mathbb{R}^{d_f\times d_s}$ are learned during training but shared across token positions. Unlike selective Mamba, this module does not compute input-dependent state-space parameters. Accordingly, we describe it as a \emph{non-selective affine recurrent state-space aggregator}, not as an implementation of selective Mamba.
+-% --- END ADDITION ---
+-
+-This recurrence scans the token sequence once and scales linearly with $L$ for fixed $d_f$ and $d_s$. The final hidden state $\mathbf{h}_{L}$ is used as the sequence-level representation and is passed directly to the classifier:
+-\begin{equation}
+-\widehat{\mathbf{y}}
+-=
+-\operatorname{softmax}
+-\left(
+-\mathbf{h}_{L}\mathbf{W}_{\mathrm{cls}}
+-+
+-\mathbf{b}_{\mathrm{cls}}
+-\right),
+-\label{eq:ssm_softmax}
+-\end{equation}
+-where $\mathbf{W}_{\mathrm{cls}}\in\mathbb{R}^{d_s\times N_c}$ and
+-$\mathbf{b}_{\mathrm{cls}}\in\mathbb{R}^{N_c}$ are classifier parameters, and $N_c$ is the number of target classes. The classification loss is defined using cross-entropy as
+-\begin{equation}
+-\mathcal{L}
+-=
+--\frac{1}{B}
+-\sum_{b=1}^{B}
+-\sum_{i=1}^{N_c}
+-y_{b,i}
+-\log
+-\left(
+-\widehat{y}_{b,i}
+-\right),
+-\label{eq:ce_loss}
+-\end{equation}
+-where $B$ denotes the batch size and $N_c$ is the number of classes. The term $y_{b,i}\in\{0,1\}$ represents the one-hot ground-truth label of sample $b$ for class $i$, and $\widehat{y}_{b,i}$ denotes the corresponding predicted probability.
+-
+-
+-
+-
+-% \vspace{-10pt}
++Training uses categorical cross-entropy plus the regularization losses attached to active spline weights. For fixed widths, the recurrent scan costs $O(L(d_s^2+d_fd_s))$. The two attention calls retain $O(L^2d)$ arithmetic and $O(HL^2)$ attention-score storage, where $H$ is the head count. The shared weights reduce stored parameters but do not remove the second attention call. RBF expansion additionally costs $O(LdM)$ basis operations and $O(LdMd_{\rm out})$ projection arithmetic per mapping. The complete model therefore does not have linear complexity in token length. Parameter count alone does not establish runtime or memory superiority.
++\end{revision}
++
+ \section{Experimental Settings and Dataset Information}
+ \label{sec:experiments}
+ 
+ FKANMamba was evaluated on five publicly available HSI benchmarks: QUH-Pingan (PI), QUH-Qingyun (QUH), QUH-Tangdaowan (TH), WHU-Hi-HanChuan (HC), and WHU-Hi-HongHu (HH). Together, these datasets cover a range of acquisition environments, including coastal, urban, wetland, and agricultural regions, thereby providing diverse conditions for assessing spectral-spatial classification performance. Their principal characteristics are listed in Table~\ref{tab:hsi_datasets}. PI, QUH, and TH were collected in Qingdao, China, using a UAV-based Gaiasky mini2-VN HSI system~\cite{ref30}. PI represents a coastal scene containing marine, infrastructure, and land-cover categories, whereas QUH primarily contains urban surface and object classes. TH provides a more heterogeneous wetland environment composed of vegetation, exposed soil, and artificial structures.
+-\input{tables/datasets}
+-The WHU-Hi benchmark collection provides UAV-based HSI scenes designed for fine-grained land-cover classification ~\cite{ref31}. HC contains heterogeneous crop regions and complex field structures, whereas HH includes a larger set of crop categories with substantial spectral similarity among several cultivars. These characteristics make both scenes useful for evaluating the model's ability to distinguish spectrally related classes while preserving local spatial context. Detailed acquisition information, spatial dimensions, spectral properties, and class statistics are provided in Table~\ref{tab:hsi_datasets}. All models are trained using the same data split (5\% for training, 5\% for validation, and 90\% for testing). PCA was applied to retain 15 spectral components, and $12\times12$ patches were used to construct local spectral-spatial samples. FKANMamba was trained for 50 epochs with a batch size of 56 using Adam with an initial learning rate of $1\times10^{-4}$, a decay parameter of $1\times10^{-6}$, and gradient-norm clipping at 1.0. The model used an embedding dimension of 32, 8 attention heads, and a state dimension of 64. A dropout rate of 0.7 was applied to the attention weights during training. For clarity, the best, second-best, and third-best values in each row of the classification performance tables are marked in \textcolor{teal}{\textbf{teal}}, \textcolor{orange}{\textbf{orange}}, and \textcolor{red}{\textbf{red}}, respectively.
+-
++\input{revision_assets/tables/datasets}
++The WHU-Hi benchmark collection provides UAV-based HSI scenes designed for fine-grained land-cover classification ~\cite{ref31}. HC contains heterogeneous crop regions and complex field structures, whereas HH includes a larger set of crop categories with substantial spectral similarity among several cultivars. These characteristics make both scenes useful for evaluating the model's ability to distinguish spectrally related classes while preserving local spatial context. Detailed acquisition information, spatial dimensions, spectral properties, and class statistics are provided in Table~\ref{tab:hsi_datasets}. \begin{revision}
++\textbf{Historical protocol.} The inspected scripts construct patches for labeled centers, exclude label zero, and stratify two random splits by center label. A 90\% test fraction followed by a 50/50 division of the remaining centers yields approximately 5\% training and 5\% validation; the historical ratio arguments are relative weights within the non-test remainder. The default split seed is 345 and is not connected to the training-seed argument. Adjacent sets can share patch pixels. Zero padding is used at scene boundaries. PCA is fitted to the flattened full scene with whitening, retaining 15 components; no separate standard-scaling step is present in this path. This exposes held-out scene spectra to preprocessing and makes the historical evaluation transductive. The historical results are therefore within-scene single-run observations, not spatially independent or cross-scene validation.
++
++The recovered configuration uses 50 epochs, batch size 56, legacy Adam with learning rate $10^{-4}$ and optimizer learning-rate decay $10^{-6}$, gradient clipping at norm 1.0, embedding width 32, eight heads, and hidden width 64. The optimizer decay is not weight decay; active spline weights separately carry an L2 penalty. Validation loss and accuracy are monitored, but the inspected path evaluates the final epoch without validation-based checkpoint selection. The current local main script contains committed merge-conflict markers; its recovered incoming-side definition is a candidate reference whose relation to every historical run requires verification. Its HC parameter count is 52,760, whereas the historical table reports 37,540; every dataset shows the same 15,220-parameter discrepancy. Full revision training is blocked until this configuration mismatch is resolved, and the archived parameter totals are not attributed to the recovered model. The original baseline partitions, initializations, implementations, and environment cannot all be authenticated from aggregate table values. Thus the earlier assertion that all methods used identical partitions is unverified for the archived results. The new protocol below enforces shared partitions and records their hashes.
++\end{revision}
+ \section{Results Analysis}
+ 
+-FKANMamba was evaluated against HSIC baseline methods from three model families. The Transformer-based baselines include Hybrid Convolution Transformer (HViT)~\cite{ref32}, A Spatial-Spectral Transformer for HSIC Based on Global Dependencies of Multi-Scale Features (SSF)~\cite{ref33}, and Differential Spatial-Spectral Transformer (DF)~\cite{ref34}. The Mamba-based baselines include Multi-head Spatial-Spectral Mamba for HSIC (MHM)~\cite{ref35}, Spatial-Spectral Wavelet Mamba (WM)~\cite{ref36}, and Spatial-Spectral Morphological Mamba (SSMM)~\cite{ref37}. The KAN-based baselines consist of Spectral-Spatial Feature Tokenization Transformer Kolmogorov-Arnold Networks (SSFTTKAN)~\cite{ref25} and HybridKAN~\cite{ref26}. To ensure a consistent comparison protocol, all methods were evaluated using the same training, validation, and test partitions and the same patch size. Performance was assessed using OA, AA, and $\kappa$, while classification maps were used to examine spatial prediction consistency and class-wise behavior.
+-
+-\input{tables/hc_acc}
+-The results on the HC dataset are reported in Table~\ref{tab:HC} and Fig.~\ref{fig:HC}. FKANMamba achieves the highest OA, AA, and $\kappa$, reaching 98.63\%, 97.43\%, and 98.40\%, respectively. It improves OA by 2.06\% over the ViT-based baseline, 3.38\% over the Mamba-based baseline, and 3.81\% over the KAN-based baseline. At the class level, FKANMamba obtains the best accuracy in 11 of 16 categories, with clear gains for difficult classes such as Watermelon, Bright object, Bare soil, and Road. The model also remains substantially more compact than the KAN-based baselines, using 37.54k parameters compared with 15.06M for SSFTTKAN and 197.81k for HybridKAN. The classification maps in Fig.~\ref{fig:HC} show fewer isolated errors and more coherent class regions, which is consistent with the quantitative results.
+-\begin{figure}
+-   \centering
+-   \includegraphics[width=\columnwidth]{Fig/HC.png}
+-   \caption{Classification maps on the HC dataset.}
+-   \label{fig:HC}
+-\end{figure}
+-% ###### Results of HC Ends ####
+-% ###### Results of HH Start ####
+-\input{tables/hh_acc}
+-
+-Table~\ref{tab:HH} reports the results on the HH dataset, which contains fine-grained crop categories with highly similar spectral responses. FKANMamba achieves the highest OA and $\kappa$, with values of 98.63\% and 98.27\%, respectively. It improves OA by 1.54\% over SSFTTKAN, 1.90\% over SSF, and 2.18\% over SSMM. Notable gains are observed for several challenging crop classes, including Film-covered lettuce, Cotton firewood, White radish, and Romaine lettuce. Although SSFTTKAN obtains a higher AA, FKANMamba provides better OA and $\kappa$ with a much smaller parameter count. The visual comparison in Fig.~\ref{fig:HH} shows clearer field boundaries and fewer fragmented predictions in adjacent agricultural regions.
+-
+-\begin{figure}
+-   \centering
+-   \includegraphics[width=\columnwidth]{Fig/HH.png}
+-   \caption{Classification maps on the HH dataset.}
+-   \label{fig:HH}
+-\end{figure}
+-% ###### Results of HH Ends ####
+-
+-% ###### Results of TH Starts ####
+-The TH results are shown in Table~\ref{tab:TH} and Fig.~\ref{fig:TH}. FKANMamba obtains an OA of 99.31\%, an AA of 98.50\%, and a $\kappa$ of 99.21\%, indicating strong performance across heterogeneous wetland, vegetation, bare-soil, and built-structure regions. Several classes, including Bare soil and Bulrush, are classified with 100\% accuracy. The model also improves difficult categories such as Boardwalk, Coniferous pine, and Spiraea. With 37.7k parameters, FKANMamba is considerably smaller than HViT and SSF while achieving higher aggregate accuracy. The classification maps in Fig.~\ref{fig:TH} further show well-defined class regions and fewer fragmented predictions in heterogeneous areas.
+-
+-\input{tables/th_acc}
+-
+-\begin{figure}[h]
+-    \centering
+-    \includegraphics[width=\columnwidth]{Fig/TH.png}
+-    \caption{Classification Maps on the TH dataset.}
+-    \label{fig:TH}
+-\end{figure}
+-
+-The PI results are summarized in Table~\ref{tab:PI} and Fig.~\ref{fig:PI}. This coastal urban scene contains natural surfaces, man-made structures, and water-related categories, where spectral similarity between infrastructure and shoreline regions makes classification challenging. FKANMamba achieves the highest aggregate performance, with an OA of 98.84\%, an AA of 96.93\%, and a $\kappa$ of 98.27\%. At the class level, it obtains the best accuracy for Ship, Wharf construction land, and Road, and remains competitive on Car. Although SSFTTKAN performs better in selected categories such as Steel houses, Floating pier, and Car, FKANMamba achieves a higher OA with a much smaller parameter count. The classification maps in Fig.~\ref{fig:PI} show clearer boundaries and fewer isolated errors around coastal infrastructure and water-adjacent regions, supporting the quantitative results.
+-
+-\input{tables/pi_acc}
+-\begin{figure}[h]
+-    \centering
+-    \includegraphics[width=\columnwidth]{Fig/PI.png}  
+-    \caption{Classification Maps on the PI dataset.}
+-    \label{fig:PI}
+-\end{figure}
+-
+-The QUH results are reported in Table~\ref{tab:QUH} and Fig.~\ref{fig:QUH}. FKANMamba achieves the best aggregate performance, with an OA of 98.37\%, an AA of 96.93\%, and a $\kappa$ of 97.85\%. At the class level, it achieves the highest accuracy for Trees and remains highly competitive for concrete buildings, Ironhide buildings, plastic playgrounds, and asphalt roads. For the challenging class Car, FKANMamba reaches 87.59\%, clearly outperforming the Mamba-based baselines, although SSFTTKAN achieves the highest accuracy for this category. These results suggest that FKANMamba improves the discrimination of small urban objects while maintaining stable performance on larger surface categories. The classification maps in Fig.~\ref{fig:QUH} show smoother class regions and fewer visible misclassifications, which is consistent with the quantitative results.
+-
+-\input{tables/quh_acc}
+-\begin{figure}
+-    \centering
+-    \includegraphics[width=\columnwidth]{Fig/QUH.png}
+-    \caption{Classification Maps on the QUH dataset.}
+-    \label{fig:QUH}
+-\end{figure}
++FKANMamba was evaluated against HSIC baseline methods from three model families. The Transformer-based baselines include Hybrid Convolution Transformer (HViT)~\cite{ref32}, A Spatial-Spectral Transformer for HSIC Based on Global Dependencies of Multi-Scale Features (SSF)~\cite{ref33}, and Differential Spatial-Spectral Transformer (DF)~\cite{ref34}. The Mamba-based baselines include Multi-head Spatial-Spectral Mamba for HSIC (MHM)~\cite{ref35}, Spatial-Spectral Wavelet Mamba (WM)~\cite{ref36}, and Spatial-Spectral Morphological Mamba (SSMM)~\cite{ref37}. The KAN-based baselines consist of Spectral-Spatial Feature Tokenization Transformer Kolmogorov-Arnold Networks (SSFTTKAN)~\cite{ref25} and HybridKAN~\cite{ref26}. The archived comparisons are reported under the historical protocol; their exact per-method provenance remains to be authenticated. Performance was assessed using OA, AA, and $\kappa$, while classification maps were used to examine spatial prediction consistency and class-wise behavior.
++
++\input{revision_assets/tables/hc_acc}
++\begin{revision}
++Table~\ref{tab:HC} and Fig.~\ref{fig:HC} show the historical HC within-scene results. These scores are single-run observations under overlapping random-pixel sampling and full-scene PCA. They establish neither repeated-run superiority nor spatially independent generalization. Parameter counts measure storage size; the maps are qualitative illustrations rather than independent evidence of deployment performance.
++\end{revision}
++
++\begin{figure*}[t]
++\centering
++\includegraphics[width=0.98\textwidth]{revision_assets/figures/HC.png}
++\caption{Historical within-scene classification maps on HC. External panel labels and layout have been revised for readability; predictions and class colors are unchanged.}
++\label{fig:HC}
++\end{figure*}
++\input{revision_assets/tables/hh_acc}
++
++\begin{revision}
++Table~\ref{tab:HH} and Fig.~\ref{fig:HH} show the historical HH within-scene results. These scores are single-run observations under overlapping random-pixel sampling and full-scene PCA. They establish neither repeated-run superiority nor spatially independent generalization. The reported OA difference between FKANMamba and SSF is $98.63-95.83=2.80$ percentage points. SSFTTKAN has higher AA, so the table does not show uniform superiority across metrics. Parameter counts measure storage size; the maps are qualitative illustrations rather than independent evidence of deployment performance.
++\end{revision}
++
++\begin{figure*}[t]
++\centering
++\includegraphics[width=0.98\textwidth]{revision_assets/figures/HH.png}
++\caption{Historical within-scene classification maps on HH. External panel labels and layout have been revised for readability; predictions and class colors are unchanged.}
++\label{fig:HH}
++\end{figure*}
++
++\begin{revision}
++Table~\ref{tab:TH} and Fig.~\ref{fig:TH} show the historical TH within-scene results. These scores are single-run observations under overlapping random-pixel sampling and full-scene PCA. They establish neither repeated-run superiority nor spatially independent generalization. Parameter counts measure storage size; the maps are qualitative illustrations rather than independent evidence of deployment performance.
++\end{revision}
++
++\input{revision_assets/tables/th_acc}
++
++\begin{figure*}[t]
++\centering
++\includegraphics[width=0.98\textwidth]{revision_assets/figures/TH.png}
++\caption{Historical within-scene classification maps on TH. External panel labels and layout have been revised for readability; predictions and class colors are unchanged.}
++\label{fig:TH}
++\end{figure*}
++
++\begin{revision}
++Table~\ref{tab:PI} and Fig.~\ref{fig:PI} show the historical PI within-scene results. These scores are single-run observations under overlapping random-pixel sampling and full-scene PCA. They establish neither repeated-run superiority nor spatially independent generalization. Parameter counts measure storage size; the maps are qualitative illustrations rather than independent evidence of deployment performance.
++\end{revision}
++
++\input{revision_assets/tables/pi_acc}
++\begin{figure*}[t]
++\centering
++\includegraphics[width=0.98\textwidth]{revision_assets/figures/PI.png}
++\caption{Historical within-scene classification maps on PI. External panel labels and layout have been revised for readability; predictions and class colors are unchanged.}
++\label{fig:PI}
++\end{figure*}
++
++\begin{revision}
++Table~\ref{tab:QUH} and Fig.~\ref{fig:QUH} show the historical QUH within-scene results. These scores are single-run observations under overlapping random-pixel sampling and full-scene PCA. They establish neither repeated-run superiority nor spatially independent generalization. Parameter counts measure storage size; the maps are qualitative illustrations rather than independent evidence of deployment performance.
++\end{revision}
++
++\input{revision_assets/tables/quh_acc}
++\begin{figure*}[t]
++\centering
++\includegraphics[width=0.98\textwidth]{revision_assets/figures/QUH.png}
++\caption{Historical within-scene classification maps on QUH. External panel labels and layout have been revised for readability; predictions and class colors are unchanged.}
++\label{fig:QUH}
++\end{figure*}
+ 
+ \section{Ablation Study}
+ \label{sec:ablation}
+@@ -530,58 +416,78 @@
+ 
+ \subsection{FSSA vs. Other Attention Mechanisms}
+ 
+-Table~\ref{tab:attention_comparison} compares FSSA with no attention (NA), multi-head self-attention (MHSA), cross-attention (CA), and differential multi-head self-attention (DMHSA). The variant without attention obtains the lowest OA on all datasets, indicating that token-relation modeling is important for HSIC. MHSA and CA both improve performance by capturing dependencies among spectral-spatial tokens, while DMHSA provides competitive results on PI and QUH by reducing redundant token interactions. Among the attention variants compared, FSSA achieves the highest OA, AA, and $\kappa$ across all datasets. It obtains 98.63\% OA on HC and HH, 99.31\% on TH, 98.84\% on PI, and 98.37\% on QUH. Compared with the strongest conventional attention variant, FSSA improves OA by 1.19\% on PI and by 1.84\% on QUH. These results suggest that replacing linear query, key, and value projections with RBF-based FastKAN mappings improves the nonlinear modeling of Spectral-Spatial token dependencies.
+-
+-\input{tables/diff_atn}
++\begin{revision}
++Table~\ref{tab:attention_comparison} contains historical single-run comparisons. Its NA row cannot be assumed identical to the without-FSSA row in Table~\ref{tab:feb_fssa}; their configurations must be recovered before a causal comparison is defensible. The observed attention differences alone do not isolate nonlinear projection capacity, normalization, parameter count, or optimization. New controlled variants are specified in Section~\ref{sec:revision_protocol}.
++\end{revision}
++\input{revision_assets/tables/diff_atn}
+ 
+ \subsection{Analysis of FEB and FSSA Modules}
+ 
+-Table~\ref{tab:feb_fssa} shows that removing FEB component results in moderate performance reductions across most datasets, with the largest OA drops observed on HH and HC. The effect is more pronounced in AA, especially for HC, HH, and TH, suggesting that FEB primarily improves class-wise representation quality through channel-wise feature modulation. On QUH, removing FEB produces a marginal increase in OA and $\kappa$, although AA decreases slightly, indicating that the contribution of FEB can vary with dataset characteristics. Removing FSSA causes substantially larger performance drops across all datasets, with OA reductions of 12.84\%, 9.29\%, 5.93\%, 5.70\%, and 6.98\% on HC, HH, PI, TH, and QUH, respectively. Similar trends are observed for AA and $\kappa$. This degradation shows that nonlinear attention over the spectral and spatial token representations is a central component of FKANMamba. FSSA provides the main dependency-modeling capability, while FEB further refines the token features through context-guided channel modulation.
+-%%%%%%%%%%%%%%%%%%%%%%%
+-\input{tables/feb_fssa_abliation}
+-%%%%%%%%%%%%%%%%%%%%%%%
+-\input{tables/patch_acc}
++\begin{revision}
++The historical module table shows dataset- and metric-dependent effects. On QUH, without FEB has OA 98.46\% versus 98.37\% and $\kappa$ 97.96\% versus 97.85\%, while AA falls from 96.93\% to 96.56\%. OA weights classes by frequency whereas AA averages class accuracies equally, so changes need not have the same direction. These small single-run differences do not establish a reliable FEB benefit or harm. No physical mechanism is inferred without supporting analysis. Larger drops after FSSA removal indicate an association for that full variant, not proof that RBF projections alone cause the difference. The new study pairs repetitions and reports per-class outcomes.
++\end{revision}
++\input{revision_assets/tables/feb_fssa_abliation}
++\input{revision_assets/tables/patch_acc}
+ \begin{figure*}[h]
+     \centering
+-    \includegraphics[width=0.80\textwidth]{Fig/fig_training_time_ratio.png}
+-    \caption{  Training ratio–accuracy–efficiency trade-off of FKANMamba on five HSI benchmarks}
++    \includegraphics[width=0.80\textwidth]{revision_assets/figures/training_ratio.png}
++    \caption{  Training ratio--accuracy--efficiency trade-off of FKANMamba on five HSI benchmarks}
+     \label{fig:diff_ratio}
+ \end{figure*}
+-%%%%%%%%%%%%%%%%%%%%%%%
+ \subsection{Impact of Patch Size}
+-Table~\ref{tab:patch_acc} shows the influence of patch size on FKANMamba. In general, larger patches improve OA, AA, and $\kappa$ by providing richer spatial context for distinguishing spectrally similar classes. This trend is clear on HC, HH, and TH, where OA increases substantially from $2\times2$ to larger patch sizes. However, the best patch size is not identical across all datasets and metrics. On PI, the highest OA and $\kappa$ are obtained with a $12\times12$ patch, while AA peaks at $10\times10$. On QUH, OA and $\kappa$ reach their highest values at $14\times14$. These results indicate that the optimal spatial neighborhood is dataset-dependent, and that increasing patch size does not uniformly improve all metrics.
+-
++\begin{revision}
++Table~\ref{tab:patch_acc} is a historical sensitivity analysis under overlapping patch sampling. Increasing patch size changes both available context and train/test neighborhood overlap, so its accuracy trend cannot be attributed solely to richer context. The new protocol fixes $p=12$ in advance and does not select a patch size using held-out test scores.
++\end{revision}
+ \subsection{Training-Ratio Trade-Off: Accuracy Versus Efficiency}
+ 
+-Fig.~\ref{fig:diff_ratio} compares the accuracy and training cost of FKANMamba under different training sample ratios. FKANMamba already achieves strong performance with only 5\% labeled samples, with OA exceeding 98\% on all five datasets. Increasing the training ratio from 5\% to 25\% raises the average OA from 98.76\% to 99.46\%, corresponding to an absolute gain of 0.70\%. The saturation point differs across datasets: HC and TH reach their best OA before 25\%, whereas HH and QUH continue to benefit from additional labeled samples. Training time increases much more rapidly than accuracy. For example, increasing the PI training ratio from 5\% to 25\% raises training time by about \(6.25\times\), while OA improves by only 0.50\%. Similarly, QUH training time increases by approximately \(4.78\times\) for an OA gain of 1.22\%. These results show a clear accuracy-efficiency trade-off. Therefore, the 5\% training ratio is used in the main experiments because it achieves strong classification accuracy across all datasets while substantially reducing computational cost.
++\begin{revision}
++Fig.~\ref{fig:diff_ratio} reports historical accuracy and training cost as the labeled ratio changes within FKANMamba. It is not an inter-model runtime benchmark. The revision fixes the labeled ratio in advance rather than selecting it from held-out test accuracy. The figure does not demonstrate computational superiority over other methods.
++\end{revision}
++
++\subsection{Revision Study Protocol and Evidence Status}
++\label{sec:revision_protocol}
++\begin{revision}
++\textbf{Status.} This subsection specifies the revision study; it does not report completed new results. The predeclared matrix has 460 runs: nine methods on five scenes under random sampling, nine methods on HC/HH under spatial sampling, seven controlled variants on HC/HH under both protocols, and a QUH without-FEB check, each with five repetitions. HC/HH are chosen before inspecting new scores because of their fine-grained agricultural categories. All completed scheduled runs, including unfavorable results, will be reported.
++
++\textbf{Sampling and preprocessing.} Repetition $r=0,\ldots,4$ uses split seed $345+r$ and training seed $r$. All methods share the center indices for a dataset, protocol, and repetition. Random sampling is class-stratified 5\%/5\%/90\%. The spatial protocol uses $64\times64$ blocks on HC and $24\times24$ blocks on HH. Label-only feasibility checks found that HH could not satisfy the class-coverage and sample-count constraints at block widths 64, 48, or 32; width 24 was fixed before model training or inspection of accuracy. Blocks are assigned using ground-truth class coverage and count constraints, never spectra or accuracy. Approximately 20\% of eligible blocks are allocated to each of training and validation, with the remainder for testing. Training and validation centers are sampled to target 5\% of each scene's labeled class population where feasible. A center is retained only if its entire $12\times12$ patch fits in its own block. Realized fractions, class counts, excluded pixels, and block masks will be reported; the two scenes' block scales and retained test coverage differ. Infeasible class coverage stops the protocol; classes are not silently removed. Train/validation/test patch-support intersections must be zero. PCA with whitening is fitted only to training-center spectra, then applied unchanged to the scene; no additional spectral standardization is introduced. Full-scene preprocessing is confined to the explicitly labeled historical results.
++
++\textbf{Training and reproducibility.} The FKANMamba schedule remains 50 epochs, batch size 56, and the optimizer settings stated above. The final epoch is evaluated; validation is monitored and test scores are not used for configuration selection. Published baseline settings and any justified deviations require an authenticated implementation record. Each run stores source hashes, exact center indices, block assignments, PCA state, seeds, environment, configuration, training history, checkpoint, predictions, and per-class confusion counts. Five repetitions vary both partitioning and training randomness; they are not five initializations on one fixed split. Missing or failed runs are listed and not silently omitted from summaries.
++
++\textbf{Controlled variants.} The seven variants replace FastKAN Q/K/V with normalized linear maps; replace them with normalized GELU MLPs of width 128; replace FEB's FastKAN gates with corresponding MLP gates; bypass FEB; bypass FSSA while keeping FEB/fusion/recurrence; replace recurrence with mean pooling; or replace recurrence with a selective-Mamba block. Interfaces remain fixed and parameter differences are reported. The selective control has model width 64, state width 64, convolution width 4, expansion 2, and a final-position readout. The TensorFlow selective-scan reference is sequential and is not an optimized CUDA implementation; external reference parity is required before attributing results to a verified conventional Mamba block. These controls address projection capacity and aggregation choices separately, not a newly invented component family.
++
++\textbf{Statistics.} OA, AA, $\kappa$, and per-class accuracy will be reported as mean and sample standard deviation over all five repetitions, together with paired OA differences. Primary OA comparisons use two-sided exact paired sign-flip tests with Holm correction within the random and spatial comparison families. With five pairs the minimum attainable two-sided p-value is 0.0625; lack of significance is not equivalence. These repetitions are conditional on the five scenes and do not establish population-wide or cross-scene generalization.
++
++\textbf{Computational measurements.} Record GPU model, driver, CUDA/cuDNN, framework, CPU, host RAM, precision, batch size, and compilation settings. On an otherwise idle GPU, use FP32, warm-up, synchronized repetitions, batch-1 latency, and batch-56 throughput. Report peak training/inference device memory, first-epoch/steady-state epoch time, and total training time, separating preprocessing and initialization. FLOPs accounting includes both attention calls, RBF projections, and repeated scan operations; state the operation convention and unsupported profiler operations. No comparative efficiency claim is made from partial FLOPs alone. Training-only pilots estimate the budget before test evaluation.
++
++\pending{Insert the five-seed main results, HC/HH spatial results, controlled ablations, QUH FEB analysis, paired statistics, and controlled computational table. The exact public archive URL and final PDF page references remain to be supplied.}
++\end{revision}
+ 
+ \section{Conclusion}
+ \label{sec:conclusion}
+ 
+-This work presented FKANMamba, a nonlinear spectral-spatial framework that integrates FastKAN transformations with state-space modeling for HSIC. The model first generates branch-specific spectral and spatial token representations through independent learnable projections. These representations are refined by the context-guided FEB and further processed by FSSA, where nonlinear FastKAN mappings are used to construct query, key, and value features. The fused token sequence is then passed to a state-space module to efficiently aggregate contextual information. Experiments on five public HSI benchmark datasets showed that FKANMamba achieved OA values of 98.63\%, 98.63\%, 98.84\%, 99.31\%, and 98.37\% on HC, HH, PI, TH, and QUH, respectively. The proposed method performed favorably compared with representative ViTs, Mamba, and KAN-based HSIC methods while maintaining a compact parameter count. Ablation studies further showed that FSSA provides the main contribution to token-dependency modeling, while FEB improves feature refinement through context-guided channel modulation. Additional analyses on patch size and training ratios indicated that FKANMamba maintains strong performance under limited labeled supervision and offers a practical trade-off between accuracy and training cost. These results suggest that combining nonlinear FastKAN mappings with efficient state-space modeling is a promising direction for learning discriminative spectral-spatial representations from limited labeled HSI data. Future work will investigate cross-sensor transfer, semi-supervised learning, multimodal fusion, and efficient deployment under varying acquisition conditions.
+-
++\begin{revision}
++FKANMamba combines established RBF mappings, two-view attention, and a non-selective affine recurrent readout. The corrected description preserves the implemented operations while separating them from selective Mamba. Historical single-run within-scene results suggest a useful compact classifier, but they do not establish repeated-run superiority, spatially independent generalization, or comparative runtime advantage. The controlled experiments in Section~\ref{sec:revision_protocol} are required before drawing stronger conclusions. \pending{Replace this provisional conclusion with claims supported by the completed revision study.}
++
++\textbf{Limitations.}\label{sec:limitations} Historical spatial overlap and transductive preprocessing limit the interpretation of accuracy. The fixed representative token is not the target spectrum, the two views are not pixel-aligned, and the recurrence is non-selective. The planned spatial comparison covers HC and HH only; it cannot establish transfer between scenes or sensors. Five pipeline repetitions measure variability conditional on these datasets and protocols, with limited power for paired tests. Runtime depends on implementation and hardware, especially for a sequential TensorFlow selective-scan reference. Cross-scene transfer and deployment validation remain outside the present evidence.
++\end{revision}
+ \section*{Acknowledgment}
+-The following are results of a study on the ‘Convergence and Open Sharing System’ project, supported by the Ministry of Education and the National Research Foundation of Korea.
+-
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
++The following are results of a study on the `Convergence and Open Sharing System' project, supported by the Ministry of Education and the National Research Foundation of Korea.
++
+ \bibliographystyle{IEEEtran}
+-\bibliography{IEEEabrv,sample}
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-
+-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{bib/arslan.png}}]{MUHAMMAD ARSLAN} is an Integrated Master's and Ph.D. researcher in the Department of Computer Engineering at Korea Aerospace University, Goyang, Republic of Korea. His research focuses on computer vision and hyperspectral imaging across remote sensing domains. He is actively engaged in remote sensing research, working toward practical and scalable solutions for advanced remote sensing applications.
++\bibliography{revision_assets/support/sample}
++
++\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{revision_assets/support/bib/arslan.png}}]{MUHAMMAD ARSLAN} is an Integrated Master's and Ph.D. researcher in the Department of Computer Engineering at Korea Aerospace University, Goyang, Republic of Korea. His research focuses on computer vision and hyperspectral imaging across remote sensing domains. He is actively engaged in remote sensing research, working toward practical and scalable solutions for advanced remote sensing applications.
+ \end{IEEEbiography}
+ 
+-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{bib/Jaehyeon.jpeg}}]{JAEHYEON KIM} received the M.S. degree in artificial intelligence from Korea Aerospace University, Goyang, Republic of Korea, in 2026. His research interests include trustworthy artificial intelligence, adversarial robustness, and computer vision. He is also interested in vision-language models.
++\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{revision_assets/support/bib/Jaehyeon.jpeg}}]{JAEHYEON KIM} received the M.S. degree in artificial intelligence from Korea Aerospace University, Goyang, Republic of Korea, in 2026. His research interests include trustworthy artificial intelligence, adversarial robustness, and computer vision. He is also interested in vision-language models.
+ \end{IEEEbiography}
+ 
+-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{bib/Hassaan.jpg}}]{Muhammad Hassaan Farooq Butt} is a postdoctoral research fellow at the Faculty of Environmental Sciences and Natural Resource Management (MINA), Norwegian University of Life Sciences (NMBU). He earned his Ph.D. in Computer Science and Technology from the University of Electronic Science and Technology (UESTC) in China in 2024, where his research focused on computer vision and hyperspectral imaging across forensic, medical, and remote sensing domains. His doctoral work explored efficient spatial–spectral modeling, leading to the development of several innovative architectures.
+-% During his Ph.D., he published multiple peer-reviewed articles that demonstrated both methodological innovation and strong practical relevance.
+-% In addition to his academic work, he is an experienced programmer with hands-on expertise in PyTorch, HPC pipelines, and end-to-end deep learning systems. He has also worked remotely with international technology teams on AI-driven perception and image analysis projects. At NMBU, his current research focuses on AI-based hyperspectral analysis of tree rings for past climate reconstruction.
++\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{revision_assets/support/bib/Hassaan.jpg}}]{Muhammad Hassaan Farooq Butt} is a postdoctoral research fellow at the Faculty of Environmental Sciences and Natural Resource Management (MINA), Norwegian University of Life Sciences (NMBU). He earned his Ph.D. in Computer Science and Technology from the University of Electronic Science and Technology (UESTC) in China in 2024, where his research focused on computer vision and hyperspectral imaging across forensic, medical, and remote sensing domains. His doctoral work explored efficient spatial--spectral modeling, leading to the development of several innovative architectures.
+ \end{IEEEbiography}
+ 
+-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{bib/JJ.jpg}}]{JAY HOON JUNG} received the Ph.D. degree in computer science from the State University of New York at Stony Brook. He is currently an Assistant Professor in the Department of Artificial Intelligence at Korea Aerospace University. His primary research delves into uncovering the foundational principles of artificial neural networks. He aspires to leverage these insights to develop quantum algorithms for deep learning. Additionally, he is invested in developing efficient algorithms for remote sensing.
++\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in, clip,keepaspectratio]{revision_assets/support/bib/JJ.jpg}}]{JAY HOON JUNG} received the Ph.D. degree in computer science from the State University of New York at Stony Brook. He is currently an Assistant Professor in the Department of Artificial Intelligence at Korea Aerospace University. His primary research delves into uncovering the foundational principles of artificial neural networks. He aspires to leverage these insights to develop quantum algorithms for deep learning. Additionally, he is invested in developing efficient algorithms for remote sensing.
+ \end{IEEEbiography}
+ 
++\EOD
+ \end{document}
+ 

@@ -1,0 +1,93 @@
+\begin{table}[!hbt]
+\centering
+\caption{Historical single-run within-scene results. Classwise and overall classification performance (\%) on PI dataset.}
+
+\resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c} \hline
+            \textbf{Class}  & \textbf{HViT} & \textbf{SSF} & \textbf{SSFTTKAN} & \textbf{HybridKAN} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+            Ship  & \textcolor{red}{\textbf{90.81}} & 92.35 & \textcolor{orange}{\textbf{94.77}} & 88.16  & 90.42 & 83.33 & 88.12 & 89.99 & \textcolor{teal}{\textbf{94.84}}\\ 
+            Seawater    & \textcolor{teal}{\textbf{99.55}} & \textcolor{orange}{\textbf{99.39}} & 98.33 & 99.28  & 99.04 & 98.84 & 99.23 & 98.78 & \textcolor{red}{\textbf{99.36}} \\ 
+            Trees  & \textcolor{orange}{\textbf{97.90}} & \textcolor{red}{\textbf{96.87 }}& 90.79 & 93.12 & 97.62 & 88.72 & \textcolor{teal}{\textbf{99.14}} & 96.53 & 93.07 \\ 
+            Concrete structure building  & \textcolor{teal}{\textbf{98.79}} & 97.64 & \textcolor{red}{\textbf{97.73}} & 94.83  & 96.06 & 91.69 & 96.06 & 94.70 & \textcolor{orange}{\textbf{98.04}} \\ 
+            Floating pier  & \textcolor{orange}{\textbf{96.70}} & 94.61 &  \textcolor{teal}{\textbf{98.61}}  & 87.81  & 90.15 & 83.20 & 85.49 & 85.94 & \textcolor{red}{\textbf{96.33}} \\ 
+            Brick houses   & \textcolor{teal}{\textbf{99.29}} & \textcolor{red}{\textbf{97.22}} & 91.43 & 93.63  & 95.90 & 90.66 & 97.19 & 91.00 & \textcolor{orange}{\textbf{98.61}} \\ 
+            Steel houses   & 97.69 & \textcolor{orange}{\textbf{98.41}} & \textcolor{teal}{\textbf{98.88}} & 97.14  & 96.64 & 87.68 & 96.76 & 80.46 & \textcolor{red}{\textbf{97.72}}\\ 
+            Wharf construction land  & \textcolor{red}{\textbf{95.60}} & 95.19 & 95.28 & 94.94  & 95.23 & 92.18 & \textcolor{orange}{\textbf{96.74}} & 94.03 & \textcolor{teal}{\textbf{99.25}} \\ 
+            Car   & \textcolor{red}{\textbf{90.48}} & 89.43 &\textcolor{teal}{\textbf{95.29}} & 79.96  & 79.08 & 51.89 & 82.29 & 35.85 & \textcolor{orange}{\textbf{92.87}}\\ 
+            Road  & \textcolor{orange}{\textbf{99.14}} & \textcolor{red}{\textbf{99.00}} & 96.70 & 97.98 & 98.40 & 95.62 & 98.23 & 98.27 & \textcolor{teal}{\textbf{99.19}} \\ \hline
+            
+            \textbf{OA (\%)}  & \textcolor{orange}{\textbf{98.58}} & \textcolor{red}{\textbf{98.33}} & 97.36 & 97.34 & 97.62 & 95.42 & 97.65 & 96.60 &  \textcolor{teal}{\textbf{98.84}} \\ 
+            \textbf{AA (\%)}    & \textcolor{orange}{\textbf{96.60}}& \textcolor{red}{\textbf{96.01}}  & 95.78 & 92.69 & 93.85 & 86.38 & 93.92 & 86.55 &  \textcolor{teal}{\textbf{96.93}}\\ 
+            \textbf{$\kappa$} & \textcolor{orange}{\textbf{97.88}} & \textcolor{red}{\textbf{97.52}} & 96.10 & 96.03 & 96.46 & 93.18 & 96.50 & 94.92 &  \textcolor{teal}{\textbf{98.27}} \\ \hline
+            
+            \textbf{Param} & \num{912074} &\num{2819466} & \num{15062223} &\num{196079} & \num{224298} & \num{23504} & \num{22186} & \num{25162} & \num{37150} \\ \hline
+            % \textbf{Time (s)}  & \num{2094} & \num{2089} & \num{2529} & \num{14925} & \num{9598} & \num{20717} & \num{12993} \\ \hline
+    \end{tabular}}
+    \label{tab:PI}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+
+% \begin{table}[!hbt]
+% \centering
+% \caption{Classwise and overall classification performance (\%) on Pingan dataset.}
+
+% \resizebox{\columnwidth}{!}{\begin{tabular}{c|cccccccc|c} \hline
+%             \textbf{Class}  & \textbf{HViT} & \textbf{SSFTTKAN} & \textbf{HybridKAN} & \textbf{SSViT} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+%             Ship  & \textcolor{red}{\textbf{90.81}} & \textcolor{orange}{\textbf{94.77}} & 88.16 & 90.46 & 90.42 & 83.33 & 88.12 & 89.99 & \textcolor{teal}{\textbf{94.84}}\\ 
+%             Seawater    & \textcolor{teal}{\textbf{99.55}} & 98.33 & 99.28 & \textcolor{orange}{\textbf{99.51}} & 99.04 & 98.84 & 99.23 & 98.78 & \textcolor{red}{\textbf{99.36}} \\ 
+%             Trees  & \textcolor{red}{\textbf{97.90}} & 90.79 & 93.12 & \textcolor{teal}{\textbf{99.66}} & 97.62 & 88.72 & \textcolor{orange}{\textbf{99.14}} & 96.53 & 93.07 \\ 
+%             Concrete structure building  & \textcolor{teal}{\textbf{98.79}} & 97.73 & 94.83 & \textcolor{orange}{\textbf{98.70}} & 96.06 & 91.69 & 96.06 & 94.70 & \textcolor{red}{\textbf{98.04}} \\ 
+%             Floating pier        & \textcolor{red}{\textbf{96.70}} &  \textcolor{teal}{\textbf{98.61}}  & 87.81 &\textcolor{orange}{\textbf{96.71}} & 90.15 & 83.20 & 85.49 & 85.94 & 96.33 \\ 
+%             Brick houses      & \textcolor{teal}{\textbf{99.29}} & 91.43 & 93.63 & \textcolor{red}{\textbf{98.42}} & 95.90 & 90.66 & 97.19 & 91.00 & \textcolor{orange}{\textbf{98.61}} \\ 
+%             Steel houses     & 97.69 & \textcolor{teal}{\textbf{98.88}} & 97.14 & \textcolor{orange}{\textbf{98.41}} & 96.64 & 87.68 & 96.76 & 80.46 & \textcolor{red}{\textbf{97.72}}\\ 
+%             Wharf construction land  & 95.60 & 95.28 & 94.94 & \textcolor{orange}{\textbf{98.23}} & 95.23 & 92.18 & \textcolor{red}{\textbf{96.74}} & 94.03 & \textcolor{teal}{\textbf{99.25}} \\ 
+%             Car   & 90.48 &\textcolor{teal}{\textbf{95.29}} & 79.96 & \textcolor{red}{\textbf{91.10}} & 79.08 & 51.89 & 82.29 & 35.85 & \textcolor{orange}{\textbf{92.87}}\\ 
+%             Road  & \textcolor{orange}{\textbf{99.14}} & 96.70 & 97.98 &\textcolor{red}{\textbf{98.81}} & 98.40 & 95.62 & 98.23 & 98.27 & \textcolor{teal}{\textbf{99.19}} \\ \hline
+            
+%             \textbf{OA (\%)}  & \textcolor{red}{\textbf{98.58}} & 97.36 & 97.34 &\textcolor{orange}{\textbf{98.66}} & 97.62 & 95.42 & 97.65 & 96.60 &  \textcolor{teal}{\textbf{98.84}} \\ 
+%             \textbf{AA (\%)}    & \textcolor{red}{\textbf{96.60}} & 95.78 & 92.69 & \textcolor{teal}{\textbf{97.00}} & 93.85 & 86.38 & 93.92 & 86.55 &  \textcolor{orange}{\textbf{96.93}}\\ 
+%             \textbf{$\kappa$} & \textcolor{red}{\textbf{97.88}} & 96.10 & 96.03 & \textcolor{orange}{\textbf{98.00}} & 96.46 & 93.18 & 96.50 & 94.92 &  \textcolor{teal}{\textbf{98.27}} \\ \hline
+            
+%             \textbf{Param} & \num{912074} & \num{15062223} &\num{196079} &\num{912074} & \num{224298} & \num{23504} & \num{22186} & \num{25162} & \num{37150} \\ \hline
+%             % \textbf{Time (s)}  & \num{2094} & \num{2089} & \num{2529} & \num{14925} & \num{9598} & \num{20717} & \num{12993} \\ \hline
+%     \end{tabular}}
+%     \label{tab:PI}
+% \end{table}
+
+
+
+
+
+% \begin{table}[!hbt]
+% \centering
+% \caption{Classwise and overall classification performance (\%) on Pingan dataset.}
+% \label{tab:PI}
+% \resizebox{\columnwidth}{!}{\begin{tabular}{c|ccccccc|c} \hline
+%             \textbf{Class}  & \textbf{HViT} & \textbf{SSFTTKAN} & \textbf{SSViT} & \textbf{DF} & \textbf{SSMM} & \textbf{MHM} & \textbf{WM} & \textbf{FKANMamba} \\ \hline
+%             Ship   & \textcolor{orange}{\textbf{90.81}} & 94.80 & \textcolor{red}{\textbf{90.46}} & 90.42 & 83.33 & 88.12 & 89.99 & \textcolor{teal}{\textbf{94.84}}\\ 
+%             Seawater    & \textcolor{teal}{\textbf{99.55}} & 98.27 & \textcolor{orange}{\textbf{99.51}} & 99.04 & 98.84 & 99.23 & 98.78 & \textcolor{red}{\textbf{99.36}} \\ 
+%             Trees  & \textcolor{red}{\textbf{97.90}} &90.63 & \textcolor{teal}{\textbf{99.66}} & 97.62 & 88.72 & \textcolor{orange}{\textbf{99.14}} & 96.53 & 93.07 \\ 
+%             Concrete structure building  & \textcolor{teal}{\textbf{98.79}} &97.72 & \textcolor{orange}{\textbf{98.70}} & 96.06 & 91.69 & 96.06 & 94.70 & \textcolor{red}{\textbf{98.04}} \\ 
+%             Floating pier               & \textcolor{orange}{\textbf{96.70}} & 98.81 &\textcolor{teal}{\textbf{96.71}} & 90.15 & 83.20 & 85.49 & 85.94 & \textcolor{red}{\textbf{96.33}} \\ 
+%             Brick houses                & \textcolor{teal}{\textbf{99.29}} &91.04 &\textcolor{red}{\textbf{98.42}} & 95.90 & 90.66 & 97.19 & 91.00 & \textcolor{orange}{\textbf{98.61}} \\ 
+%             Steel houses                & \textcolor{red}{\textbf{97.69}} & 99.03 &\textcolor{teal}{\textbf{98.41}} & 96.64 & 87.68 & 96.76 & 80.46 & \textcolor{orange}{\textbf{97.72 }}\\ 
+%             Wharf construction land     & 95.60 & 95.19 &\textcolor{orange}{\textbf{98.23}} & 95.23 & 92.18 & \textcolor{red}{\textbf{96.74}} & 94.03 & \textcolor{teal}{\textbf{99.25}} \\ 
+%             Car    & \textcolor{red}{\textbf{90.48}} & 94.49 &\textcolor{orange}{\textbf{91.10}} & 79.08 & 51.89 & 82.29 & 35.85 & \textcolor{teal}{\textbf{92.87}}\\ 
+%             Road   & \textcolor{orange}{\textbf{99.14}} & 96.71 &\textcolor{red}{\textbf{98.81}} & 98.40 & 95.62 & 98.23 & 98.27 & \textcolor{teal}{\textbf{99.19}} \\ \hline
+%             \textbf{OA (\%)}  & \textcolor{red}{\textbf{98.58}} & 97.32 &\textcolor{orange}{\textbf{98.66}} & 97.62 & 95.42 & 97.65 & 96.60 &  \textcolor{teal}{\textbf{98.84}} \\ 
+%             \textbf{AA (\%)}    & \textcolor{red}{\textbf{96.60}} & 95.67 & \textcolor{orange}{\textbf{97.00}} & 93.85 & 86.38 & 93.92 & 86.55 &  \textcolor{teal}{\textbf{96.93}}\\ 
+%             \textbf{$\kappa$}            & \textcolor{red}{\textbf{97.88}} &96.04 & \textcolor{orange}{\textbf{98.00}} & 96.46 & 93.18 & 96.50 & 94.92 &  \textcolor{teal}{\textbf{98.27}} \\ \hline
+%             \textbf{Param}     & \num{912074} & \num{15062223} &\num{912074} & \num{224298} & \num{23504} & \num{22186} & \num{25162} & \num{37150} \\ \hline
+%             % \textbf{Time (s)}          & \num{2094} & \num{2089} & \num{2529} & \num{14925} & \num{9598} & \num{20717} & \num{12993} \\ \hline
+%     \end{tabular}}
+   
+
+% \end{table}

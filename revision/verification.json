@@ -1,0 +1,95 @@
+{
+  "unit_tests": {
+    "command": "C:\\Users\\arslan\\AppData\\Local\\miniconda3\\envs\\hsi\\python.exe -m unittest discover -s revision -p test_*.py -v",
+    "returncode": 0,
+    "seconds": 13.786786079406738,
+    "count": 22,
+    "log": "revision/qa/final_tests.txt"
+  },
+  "source_documents": {
+    "source_checks": "pass",
+    "errors": [],
+    "concerns": 14,
+    "frozen_originals": 31,
+    "manuscript_pending_notices": 3,
+    "response_pending_notices": 12,
+    "submission_ready": false,
+    "reason": "Experiments, authenticated baselines, full FLOPs, external Mamba parity and release remain pending."
+  },
+  "spatial_feasibility": "revision/spatial_feasibility.json",
+  "independent_review": {
+    "status": "completed",
+    "important_findings": 4,
+    "fixes": [
+      "baseline counter dispatch",
+      "split/artifact/ground-truth authentication",
+      "prepared configuration/protocol identity",
+      "model/adapter dependency identity"
+    ]
+  },
+  "open_requirements": [
+    "server GPU access and pilot budget",
+    "460 completed study runs",
+    "eight authenticated baseline adapters",
+    "authenticate original source/checkpoint: recovered model has 15,220 extra parameters",
+    "external selective-Mamba block parity",
+    "complete FLOPs and comparative profiling",
+    "completed-result revision and public release"
+  ],
+  "reference_identity": "revision/model_identity.json: unverified; 15,220-parameter mismatch blocks production training",
+  "compilation": {
+    "repose_filled": {
+      "returncode": 0,
+      "log": "revision\\qa\\compile_repose_filled.txt"
+    },
+    "highlighted_filled": {
+      "returncode": 0,
+      "log": "revision\\qa\\compile_highlighted_filled.txt"
+    },
+    "clean_filled": {
+      "returncode": 0,
+      "log": "revision\\qa\\compile_clean_filled.txt"
+    }
+  },
+  "pdf_checks": {
+    "repose_filled": {
+      "pages": 5,
+      "issues": [],
+      "tex_sha256": "1880abc151f72c498fe66083864fbf8ef4bc8da972d9ff05a52d88fa800fd9c0",
+      "pdf_sha256": "9508876e4eac6ecfb526ac6580bea63e80ac4d4797355933974e36d90185ab1c",
+      "rendered_pages": 5,
+      "compiler": "Tectonic 0.17.0 (XeTeX)",
+      "warning": "Inherited class footer-box warnings remain; page geometry and rendered layout checked separately."
+    },
+    "highlighted_filled": {
+      "pages": 14,
+      "issues": [],
+      "tex_sha256": "77a5b5ce7cee9c1119d0c8d379c984234e1ae3398bceb6902ce0ea51ba835b14",
+      "pdf_sha256": "96c611c2c1a8ffc6889b328bc1e021c058bd6451de67ee982d688c36eeb8416e",
+      "rendered_pages": 14,
+      "compiler": "Tectonic 0.17.0 (XeTeX)",
+      "warning": "Inherited class footer-box warnings remain; page geometry and rendered layout checked separately."
+    },
+    "clean_filled": {
+      "pages": 13,
+      "issues": [],
+      "tex_sha256": "9cc16cd6664bdbcc76ee83184398017787ba5d4c6cf3f7f97a0b3471dcda97af",
+      "pdf_sha256": "9af7384c6fca95eb1c07524259c4443679ddf293db0b05eb0167c69f37ccfd4a",
+      "rendered_pages": 13,
+      "compiler": "Tectonic 0.17.0 (XeTeX)",
+      "warning": "Inherited class footer-box warnings remain; page geometry and rendered layout checked separately."
+    }
+  },
+  "submission_ready": false,
+  "visual_review": {
+    "status": "completed",
+    "response_pages": 5,
+    "highlighted_pages": 14,
+    "clean_pages": 13,
+    "all_rendered_pages_inspected": true,
+    "geometry_errors": 0
+  },
+  "verified_at_local": "2026-10-26T13:11:44.982562+09:00",
+  "benchmark_training_runs_completed": 0,
+  "gpu_profiles_completed": 0
+}

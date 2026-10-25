@@ -1,0 +1,228 @@
+\documentclass[a4paper,onecolumn,11pt]{IEEEtran}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \usepackage{graphicx}
+\usepackage{amsmath, amssymb}
+% \usepackage{caption, subcaption}
+% \usepackage{float}
+% \usepackage{multirow}
+% \usepackage{hyperref}
+\usepackage{soul,color}
+\usepackage{xcolor}
+\usepackage{setspace}
+
+\definecolor{reviewgreen}{RGB}{0,128,0}
+
+\begin{document}
+
+\noindent \textbf{Original Manuscript ID:} Access-2026-42627
+
+\vspace{0.5em}
+
+\noindent \textbf{Original Article Title:} ``FKANMamba: FastKAN-Enhanced State Space Learning for Spectral-Spatial Hyperspectral Image Classification''
+
+\vspace{2em}
+
+\noindent \textbf{To:} IEEE Access Editor
+
+\noindent \textbf{Re:} Response to Reviewers
+
+\vspace{2em}
+
+Dear Editor,
+
+\vspace{1em}
+We want to express our heartfelt appreciation to the Editor-in-Chief and the reviewers for their invaluable and timely feedback. We sincerely thank the Reviewers for their time and effort in reviewing our paper. Their valuable comments have been instrumental in revising and enhancing the manuscript. After carefully considering these comments, we have diligently implemented the necessary corrections to align the paper with the final approval. All of these modifications have been incorporated into this response letter. A summary of the major comments provided by the Reviewers is outlined below in green, with our responses in black for clarity.
+
+Once again, thank you for allowing a resubmission of our manuscript, with an opportunity to address the reviewers’ comments. We are uploading (a) our point-by-point response to the comments (below) (response to reviewers, under ``Author’s Response Files''), (b) an updated manuscript with yellow highlighting indicating changes (as ``Highlighted PDF''), and (c) a clean updated manuscript without highlights (``Main Manuscript'').
+
+\vspace{2em}
+
+Best regards,
+
+Dr. Jung et al.
+
+\newpage
+
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#1: Please describe the sampling and validation procedure more explicitly. Section III gives a 5\% training, 5\% validation, and 90\% testing split, but should also state how pixel centers are selected, how validation informs model selection, and which pixels are used to fit PCA and normalization. Since the inputs are overlapping patches, distinct center labels do not necessarily imply independent neighborhoods. If the splits are spatially interleaved, describe the results as within-scene classification and acknowledge the limitation. Spatially separated testing and repeated runs would be useful directions for future validation.
+}}
+
+\textbf{Author response:}
+
+
+\textbf{Author action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#2: Please make the relationship to Mamba precise. Equation 18 describes a fixed-matrix affine recurrence, whereas the cited Mamba paper emphasizes input-dependent state-space parameters. State whether the equation matches the implementation and describe the module as a linear recurrent state-space aggregator if that is what is used. This is a valid architectural choice, but should not be presented as equivalent to selective Mamba. The current experiments support the complete model more directly than the independent benefit of the recurrent stage. An isolated comparison with simple pooling could be left to future work.}}
+
+\textbf{Author Response:}
+We thank the reviewer for this valuable clarification. We confirm that the recurrence in Eq. (18) corresponds to the implemented module, in which the state-transition and input-update matrices are learned during training and shared across token positions. Unlike conventional selective Mamba, the proposed recurrent module does not employ input-dependent state-space parameters. To clarify this distinction, we have revised Section II.E to characterize the component as a non-selective affine recurrent state-space aggregator rather than a selective Mamba block. Furthermore, we acknowledge that the current experiments primarily demonstrate the effectiveness of the complete FKANMamba framework rather than the independent contribution of the recurrent stage. A controlled comparison with simpler aggregation strategies is identified as future work.
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#3: Please complete the implementation and ablation descriptions. Give the reshape and permutation steps in Section II.A, the token correspondence at fusion, the scan order, and the representative-token index for the even-sized patches. Report the RBF basis count and grid range, attention output dimension, and branch weight sharing. Also explain the difference between no attention in Table 7 and without FSSA in Table 8, which obtain different HC accuracies. The variants may reasonably differ, but readers need to know what each retains or substitutes.}}
+
+\textbf{Author response:}
+
+
+
+\textbf{Author action:}
+
+
+
+\vspace{2em}
+
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#4: Please distinguish parameter efficiency from runtime efficiency. The model is substantially smaller than the listed Transformer and KAN baselines, but not smaller than the listed Mamba baselines. Figure 7 measures the effect of changing the training ratio within FKANMamba, not its speed relative to other models. Equation 13 also retains quadratic attention, despite the linear scan that follows. Limiting the efficiency claims to the compact parameter count and the measured training-ratio tradeoff would be sufficient without requiring a new deployment study.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#5: As a minor correction, the HH discussion reports a 1.90 percentage-point OA improvement over SSF, while Table 3 gives 98.63\% and 95.83\%, a difference of 2.80 points. Please check these numerical summaries and improve the readability of the classification-map labels.
+}}
+
+
+
+\textbf{Author response:}
+
+
+
+\textbf{Author action:}
+
+
+
+\vspace{2em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#1: Potential spatial information leakage: The manuscript employs a 5\%/5\%/90\% training, validation, and testing partition while extracting overlapping 12×12 hyperspectral patches. The authors should clarify whether the partitioning was performed randomly at the pixel level or using spatially independent regions. Overlapping patches may introduce substantial spatial information leakage and lead to optimistic classification results. Additional experiments using spatially disjoint training and testing regions are strongly recommended.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#2: Clarification of the state-space architecture: Equations (17) and (18) describe a recurrent update based on learnable dense transformations. The authors should explain how this formulation relates to the selective state-space mechanisms used in conventional Mamba architectures. The differences between the proposed recurrent module, a standard linear recurrent network, and a conventional Mamba block should be explicitly established.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#3: Computational efficiency: The manuscript emphasizes parameter efficiency, but parameter count alone does not adequately characterize computational complexity. The authors should provide FLOPs, inference latency, GPU memory consumption, and training-time comparisons under consistent hardware and implementation conditions. The quadratic computational characteristics of the attention component should also be discussed.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#4: Statistical reliability:The experimental results are reported without sufficient information about variability across independent training runs. The authors should repeat the experiments using multiple random seeds and report mean accuracy and standard deviation. Statistical significance should be assessed where appropriate.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#5: Definition of the representative center token:The FEB module relies on a representative or center-pixel token. However, the experiments use 12×12 patches, which do not have a unique geometric center pixel. The authors should clarify how the representative token is selected and whether its location corresponds to the target pixel.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#6: Novelty and architectural justification: Although the integration of FastKAN, attention, and state-space modeling is potentially useful, the individual components are already established. The manuscript would benefit from additional controlled comparisons with conventional MLP projections, alternative nonlinear transformations, and standard Mamba-based sequence modeling. These experiments would help isolate the contributions of the proposed architectural choices.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#7: Generalization beyond the current evaluation protocol: The five benchmark datasets provide useful experimental coverage, but performance under spatially independent partitions and cross-scene evaluation would offer stronger evidence of generalization. At least one additional evaluation protocol designed to reduce spatial correlation between training and testing samples is recommended.
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#8: Reproducibility:The authors indicate that the source code will be released. A complete description of dataset partitions, random seeds, preprocessing, model configuration, training procedures, and computational environment should be provided. Releasing the exact experimental splits would substantially improve reproducibility.
+
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#9:  Interpretation of the ablation results: The reported ablation experiments are useful, particularly those involving FEB and FSSA. However, the authors should further explain why the contribution of FEB varies across datasets and provide a more detailed interpretation of cases in which removing a component does not reduce all evaluation metrics.
+
+}}
+
+\textbf{Author Response:}
+
+
+
+\textbf{Author Action:}
+
+
+
+\vspace{1.5em}
+
+
+\end{document}

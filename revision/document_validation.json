@@ -1,0 +1,10 @@
+{
+  "source_checks": "pass",
+  "errors": [],
+  "concerns": 14,
+  "frozen_originals": 31,
+  "manuscript_pending_notices": 3,
+  "response_pending_notices": 12,
+  "submission_ready": false,
+  "reason": "Experiments, authenticated baselines, full FLOPs, external Mamba parity and release remain pending."
+}
