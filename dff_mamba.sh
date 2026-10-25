@@ -3,8 +3,13 @@
 export QT_QPA_PLATFORM=offscreen
 
 # List of dataset choices
+<<<<<<< HEAD
 datasets=("Fe") #("PI" "TH" "QUH" "HC" "HH" ) #("PU" "TH" "PI" "UH13" "HC" "HH" "QUH") #"HH" "HC" "LK" "PI" "UH13" "SA" "PU" "PC" "QUH"
 window_sizes=(12 14 16 18 20) #(2 4 6 8 10 12 14 16 18 20)
+=======
+datasets=("HC" "HH" "PI" "TH" "QUH") #("PU" "TH" "PI" "UH13" "HC" "HH" "QUH") #"HH" "HC" "LK" "PI" "UH13" "SA" "PU" "PC" "QUH"
+window_sizes=(12) #(2 4 6 8 10 12 14 16 18 20)
+>>>>>>> 20cea71 (initial_code)
 # Define the train and validation ratios
 train_ratio=0.50
 validation_ratio=0.50

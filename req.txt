@@ -1,10 +1,18 @@
 # create env 
 conda creat -n [env_name] python==3.10.4
+<<<<<<< HEAD
 cuda = 12.2
 cudann=8.9.4
 pip install opencv-python
 pip install matplotlib
 pip install numpy,pandas seaborn scikit-learn
+=======
+conda install -c nvidia cuda=12.2 cudnn=8.9 -y
+pip install tensorflow==2.15.1
+pip install opencv-python
+pip install matplotlib
+pip install numpy pandas seaborn scikit-learn
+>>>>>>> 20cea71 (initial_code)
 pip install spectral
 pip install vit-keras
 pip install tensorflow-addons

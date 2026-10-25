@@ -16,8 +16,11 @@ import keras
 import pywt
 from tensorflow.keras import layers, Model
 from tensorflow.keras.layers import  Conv1D, MaxPooling1D, Flatten, Reshape
-from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dropout, Input, AveragePooling2D, Activation, MaxPooling2D, BatchNormalization, Concatenate
-from keras.layers import (Conv3D, Dense, Dropout,Input, Reshape, Reshape,Activation,LayerNormalization)
+from keras.layers import (Conv3D, Dense,Input, Reshape,LayerNormalization)
+from tensorflow.keras.layers import (Input, InputSpec, Add, AveragePooling2D, LeakyReLU, Multiply, 
+                                     Conv3D, Conv2D, Conv1D, BatchNormalization,MaxPool2D,Dropout,Activation,
+                                     GlobalAveragePooling2D,
+                                     Layer, Flatten, Reshape)
 from keras.losses import categorical_crossentropy
 from tensorflow.keras import regularizers
 from keras.models import Model, Sequential
@@ -28,25 +31,26 @@ from keras_cv_attention_models import attention_layers
 import matplotlib.font_manager as font_manager
 from utils import *
 import warnings
+from models.vit import SSFormer, PyFormer, WaveFormer
+from models.vit import wavelet_transform_image
 warnings.filterwarnings('ignore')
 
 parser = argparse.ArgumentParser(description="Script Description")
-
 # Add arguments for each parameter
 parser.add_argument(
     "--dataset",
     "-d",
     type=str,
-    choices= ["LK", "HC", "UH13", "PU", "PC", "SA","HH","QUH","PI","TH","Fe"], #["LK", "HC", "UH13", "IP", "BS", "KSC", "PU", "PC", "SA", "SLA"],
-    default="PU",
+    choices=["LK", "HC", "UH13", "PU", "PC", "SA","HH","QUH","PI","TH","Fe"],
+    default="SA",
     help="Dataset identifier",
 )
-parser.add_argument("--window_size", "-ws", type=int, default=4, help="Window size")
-parser.add_argument("--dl_method", "-dlm", type=str, default='PCA', help="Dimension Reduction Method")
-parser.add_argument("--test_ratio", "-te", type=float, default=0.50, help="Test ratio")
-parser.add_argument("--train_ratio", "-tr", type=float, default=0.99, help="Train ratio")
+parser.add_argument("--window_size", "-ws", type=int, default=12, help="Window size")    
+parser.add_argument("--dl_method", "-dlm", type=str, default='PCA', help="Dimension Reduction Method")  # 차원 축소 메소드
+parser.add_argument("--test_ratio", "-te", type=float, default=0.90, help="Test ratio")
+parser.add_argument("--train_ratio", "-tr", type=float, default=0.50, help="Train ratio")
 parser.add_argument(
-    "--validation_ratio", "-vr", type=float, default=0.01, help="Validation ratio"
+    "--validation_ratio", "-vr", type=float, default=0.50, help="Validation ratio"
 )
 parser.add_argument(
     "--number_of_bands",
@@ -56,25 +60,32 @@ parser.add_argument(
     help="Number of bands principal components for dimensionality reduction",
 )
 parser.add_argument(
-    "--epochs", "-e", type=int, default=50, help="Number of epochs for training"
+    "--epochs", "-e", type=int, default=5, help="Number of epochs for training"
 )
 parser.add_argument(
     "--batch_size", "-bs", type=int, default=56, help="Batch size for training"
 )
-
 # Parse the command-line arguments
 args = parser.parse_args()
 
-## Loading Hyperspectral Datasets
-base_dir = '../hsi_datasets' 
+# DataSet Loader Funtion
+base_dir = './datasets'
 def LoadHSIData(method):
+    '''
+    데이터셋 이름을 받아서 데이터 로드하는 함수수
+    method: str : 'LK', 'HC', 'UH13', 'PU', 'PC', 'SA', 'BS', 'HH', 'QUH', 'PI', 'TH'
+    dataset name
+    return: HSI, GT, Num_Classes, target_names
+    데이터, 정답, 클래스 수, 클래스 이름
+    '''
+    
     data_path = os.path.join(os.getcwd(),f'{base_dir}')
     if method == 'LK':
         ## http://rsidea.whu.edu.cn/resource_WHUHi_sharing.htm
         HSI = sio.loadmat(os.path.join(data_path, 'WHU_Hi_LongKou.mat'))['WHU_Hi_LongKou']
         GT = sio.loadmat(os.path.join(data_path, 'WHU_Hi_LongKou_gt'))['WHU_Hi_LongKou_gt']
         Num_Classes = 9
-        target_names = ['Corn', 'Cotton', 'Sesame', 'Broad-leaf soybean',
+        target_names = ['Corn', 'Cotton', 'Sesame', 'Broad-leaf soybean',       # class name list
                         'Narrow-leaf soybean', 'Rice', 'Water',
                         'Roads and houses', 'Mixed weed']
         
@@ -100,16 +111,6 @@ def LoadHSIData(method):
                         'Water spinach', 'Watermelon', 'Greens', 'Trees', 'Grass',
                         'Red roof', 'Gray roof', 'Plastic', 'Bare soil', 'Road',
                         'Bright object', 'Water']
-
-    elif method == 'IP':
-        HSI = sio.loadmat(os.path.join(data_path, 'Indian_pines_corrected.mat'))['indian_pines_corrected']
-        GT = sio.loadmat(os.path.join(data_path, 'Indian_pines_gt.mat'))['indian_pines_gt']
-        Num_Classes = 16
-        target_names = ['Alfalfa', 'Corn-notill', 'Corn-mintill', 'Corn',
-                        'Grass-pasture', 'Grass-trees', 'Grass-mowed',
-                        'Hay-windrowed', 'Oats', 'Soybean-notill', 'Soybean-mintill',
-                        'Soybean-clean', 'Wheat', 'Woods', 'Buildings',
-                        'Stone-Steel']
         
     elif method == 'BS':
         HSI = sio.loadmat(os.path.join(data_path, 'Botswana.mat'))['Botswana']
@@ -118,13 +119,6 @@ def LoadHSIData(method):
         target_names = ['Water', 'Hippo Grass', 'Floodplain Grasses 1', 'Floodplain Grasses 2',
                         'Reeds 1', 'Riparian', 'Firescar 2', 'Island Interior', 'Woodlands',
                         'Acacia Shrublands', 'Acacia Grasslands', 'Short Mopane', 'Mixed Mopane', 'Exposed Soils']
-
-    elif method == 'KSC':
-        HSI = sio.loadmat(os.path.join(data_path, 'KSC.mat'))['KSC']
-        GT = sio.loadmat(os.path.join(data_path, 'KSC_gt.mat'))['KSC_gt']
-        Num_Classes = 13
-        target_names = ['Scrub', 'Willow Swamp', 'CP/Oak', 'CP hammock', 'Slash Pine', 'Oak/Broadleaf', 'Hardwood Swamp',
-                        'Graminoid Marsh', 'Spartina Marsh', 'Cattail Marsh', 'Salt Marsh', 'Mud Flats', 'Water']
      
     elif method == 'PU':
         HSI = sio.loadmat(os.path.join(data_path, 'PaviaU.mat'))['paviaU']
@@ -149,18 +143,7 @@ def LoadHSIData(method):
                         'Grapes_untrained','Soil_vinyard_develop','Corn_Weeds',
                         'Lettuce_4wk','Lettuce_5wk','Lettuce_6wk',
                         'Lettuce_7wk', 'Vinyard_untrained','Vinyard_trellis']
-      
-    elif method == 'SLA':
-        HSI = sio.loadmat(os.path.join(data_path, 'SalinasA_corrected.mat'))['salinasA_corrected']
-        GT = sio.loadmat(os.path.join(data_path, 'SalinasA_gt.mat'))['salinasA_gt']
-        val_old = np.array([0,1,10,11,12,13,14])
-        val_new = np.array([0,1,2,3,4,5,6])
-        index = np.digitize(GT.ravel(), val_old, right=True)
-        GT = val_new[index].reshape(GT.shape)
-        Num_Classes = 6
-        target_names = ['Brocoli 1', 'Corn weeds', 'Lettuce 4wk', 'Lettuce 5wk',
-                       'Lettuce 6wk', 'Lettuce 7wk']
-
+    
     elif method == 'UH13':
         HSI = sio.loadmat(os.path.join(data_path, 'HU13.mat'))['HSI']
         GT = sio.loadmat(os.path.join(data_path, 'HU13_gt.mat'))['gt']
@@ -169,7 +152,7 @@ def LoadHSIData(method):
                     'Soil', 'Water', 'Residential', 'Commercial', 'Road',
                     'Highway', 'Railway', 'Parking Lot 1', 'Parking Lot 2',
                     'Tennis Court', 'Running Track']
-
+        
     elif method == 'QUH':
         HSI = sio.loadmat(os.path.join(data_path,'QUH-Qingyun.mat'))['Chengqu']
         GT = sio.loadmat(os.path.join(data_path,'QUH-Qingyun_GT.mat'))['ChengquGT']
@@ -182,6 +165,7 @@ def LoadHSIData(method):
         Num_Classes = 10
         target_names = ["Ship", "Seawater", "Trees"," Concrete structure building", "Floating pier", "Brick houses", 
                       "Steel houses"," Wharf construction land", "Car", "Road"]
+        
     elif method == 'TH':
         HSI = sio.loadmat(os.path.join(data_path, 'QUH-Tangdaowan.mat'))['Tangdaowan']
         GT = sio.loadmat(os.path.join(data_path, 'QUH-Tangdaowan_GT.mat'))['TangdaowanGT']
@@ -204,7 +188,6 @@ def LoadHSIData(method):
 
     return HSI, GT, Num_Classes, target_names
 
-
 ## Global Parameters for Loop
 HSID = args.dataset ## "SLA", "IP", "PU", "PC", "SA", "KSC", "BS", "LK", "HH" (difficult to compile), "HC"
 DLM = args.dl_method ## "PCA", "iPCA"
@@ -220,7 +203,7 @@ batch_size = args.batch_size
 num_heads=8
 out_channels=32
 #output_dir = os.path.join(f"baseline_results_out_32_{num_heads}_{batch_size}/{HSID}/{teRatio}/{WS}")
-output_dir = os.path.join(f"baseline_res_{out_channels}_{num_heads}_{batch_size}/{HSID}/{teRatio}/{WS}")
+output_dir = os.path.join(f"baseline_{out_channels}_{num_heads}_{batch_size}/{HSID}/{teRatio}/{WS}")
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
     
@@ -314,237 +297,6 @@ def AttentionGCN(WS, k, Num_Classes):
     return model
 # Attention GCN Ends
 
-# Hybrid Vision Transformer Starts
-# Positional Encoding
-def get_positional_encoding(max_len, d_emb):
-    pos = np.arange(max_len)[:, np.newaxis]
-    i = np.arange(d_emb)[np.newaxis, :]
-    angles = pos / np.power(10000, 2 * i / d_emb)
-    positional_encoding = np.zeros((max_len, d_emb))
-    positional_encoding[:, ::2] = np.sin(angles[:, ::2])
-    positional_encoding[:, 1::2] = np.cos(angles[:, 1::2])
-    return positional_encoding[np.newaxis, ...]
-
-class Transformer(tf.keras.layers.Layer):
-    def __init__(self, num_heads, transformer_layer_depth, d_model, dff, dropout_rate=0.1, layernorm_eps=1e-6, **kwargs):
-        super(Transformer, self).__init__(**kwargs)
-        self.num_heads = num_heads
-        self.transformer_layer_depth = transformer_layer_depth
-        self.d_model = d_model
-        self.dff = dff
-        self.dropout_rate = dropout_rate
-        self.layernorm_eps = layernorm_eps
-
-        self.mha = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)
-        self.dropout1 = tf.keras.layers.Dropout(dropout_rate)
-        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=layernorm_eps)
-        self.dense1 = tf.keras.layers.Dense(dff, activation='relu')
-        self.dense2 = tf.keras.layers.Dense(d_model)
-        self.dropout2 = tf.keras.layers.Dropout(dropout_rate)
-        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=layernorm_eps)
-
-    def call(self, inputs, training):
-        x = inputs
-        for i in range(self.transformer_layer_depth):
-            # Multi-Head Attention
-            attn_output = self.mha(x, x)
-            attn_output = self.dropout1(attn_output, training=training)
-            attn_output = self.layernorm1(x + attn_output)
-            # Feed Forward Network
-            ffn_output = self.dense1(attn_output)
-            ffn_output = self.dense2(ffn_output)
-            ffn_output = self.dropout2(ffn_output, training=training)
-            ffn_output = self.layernorm2(attn_output + ffn_output)
-            x = ffn_output
-        return x
-
-def Hybrid_ViT(WS, k, Num_Classes, num_transformer_layers=4, num_heads=8, dff=4*64, dropout_rate=0.1, layernorm_eps=1e-3):
-    input_shape = (WS, WS, k)
-
-    max_patch_size = min(input_shape[:3])
-    patch_size = max_patch_size
-    num_patches = (input_shape[0] // patch_size) * (input_shape[1] // patch_size) * (input_shape[2] // patch_size)
-    embedding_dim = 64
-    inputs = Input(shape=input_shape, name='inputs')
-    x = tf.expand_dims(inputs, axis=1) # add this line
-    # Create a patch embedding layer
-    # patch_embed = Conv3D(embedding_dim, kernel_size=(1, patch_size,  ), strides=(1, patch_size, patch_size), padding='valid', name='patch_embed')(x)
-    patch_embed = Conv3D(embedding_dim, kernel_size=(1, patch_size, patch_size), strides=(1, patch_size, patch_size), padding='valid', name='patch_embed')(x)
-    cls_token = tf.Variable(tf.zeros((1, 1, 1, embedding_dim)), name='cls_token')
-    # Add cls_token to patch embeddings
-    patch_embed = tf.concat([tf.broadcast_to(cls_token, [tf.shape(patch_embed)[0], 1, 1, 1, embedding_dim]), patch_embed], axis=1)
-    # Add positional encoding to patch embeddings
-    pos_encoding = get_positional_encoding(num_patches+1, embedding_dim)
-
-    patch_embed = patch_embed + pos_encoding
-    # Create a Transformer encoder
-    for i in range(num_transformer_layers):
-        if i == 0:
-            transformer_layer = Transformer(num_heads=num_heads, transformer_layer_depth=1, d_model=embedding_dim, dff=dff, name=f'transformer_layer_{i}')(patch_embed)
-        else:
-            transformer_layer = Transformer(num_heads=num_heads, transformer_layer_depth=1, d_model=embedding_dim, dff=dff, name=f'transformer_layer_{i}')(transformer_layer)
-
-    # Use cross-attention between the patch embeddings and a separate set of learnable embeddings
-    q = Dense(embedding_dim)(transformer_layer[:, 0, 0, 0])
-    k = Dense(embedding_dim)(patch_embed[:, 1:, :, :, :])
-    v = patch_embed[:, 1:, :, :, :]
-    cross_attn_output = tf.matmul(q[:, tf.newaxis, :], k, transpose_b=True)
-    cross_attn_output = cross_attn_output / tf.math.sqrt(tf.cast(embedding_dim, dtype=tf.float32))
-    cross_attn_output = tf.nn.softmax(cross_attn_output, axis=-1)
-    cross_attn_output = tf.matmul(cross_attn_output, v)
-    # Concatenate cls_token and cross-attention output
-    output_layer = tf.concat([transformer_layer[:, 0, 0, 0], cross_attn_output[:, 0, 0, 0]], axis=-1)
-    # Add a few dense layers and a final softmax layer
-    output_layer = Dense(dff, activation='relu')(output_layer)
-    output_layer = Dense(dff, activation='relu')(output_layer)
-    output_layer = Dense(Num_Classes, activation='softmax', name='output_layer')(output_layer)
-    # Define the model
-    model = Model(inputs=inputs, outputs=output_layer, name='Hybrid_ViT')
-    return model
-# Hybrid Vision Transformer Ends
-
-# SSViT Starts
-def get_positional_encoding_ssvit(max_len, d_emb):
-    pos = np.arange(max_len)[:, np.newaxis]
-    i = np.arange(d_emb)[np.newaxis, :]
-    angles = pos / np.power(10000, 2 * i / d_emb)
-    positional_encoding = np.zeros((max_len, d_emb))
-    positional_encoding[:, ::2] = np.sin(angles[:, ::2])
-    positional_encoding[:, 1::2] = np.cos(angles[:, 1::2])
-    return positional_encoding[np.newaxis, ...]
-
-
-class Transformer_SSViT(tf.keras.layers.Layer):
-    def __init__(
-        self,
-        num_heads,
-        transformer_layer_depth,
-        d_model,
-        dff,
-        dropout_rate=0.1,
-        layernorm_eps=1e-6,
-        **kwargs,
-    ):
-        super(Transformer_SSViT, self).__init__(**kwargs)
-        self.num_heads = num_heads
-        self.transformer_layer_depth = transformer_layer_depth
-        self.d_model = d_model
-        self.dff = dff
-        self.dropout_rate = dropout_rate
-        self.layernorm_eps = layernorm_eps
-
-        self.mha = tf.keras.layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=d_model
-        )
-        self.dropout1 = tf.keras.layers.Dropout(dropout_rate)
-        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=layernorm_eps)
-        self.dense1 = tf.keras.layers.Dense(dff, activation="relu")
-        self.dense2 = tf.keras.layers.Dense(d_model)
-        self.dropout2 = tf.keras.layers.Dropout(dropout_rate)
-        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=layernorm_eps)
-
-    def call(self, inputs, training):
-        x = inputs
-        for i in range(self.transformer_layer_depth):
-            # MultiHead Attention
-            attn_output = self.mha(x, x)
-            attn_output = self.dropout1(attn_output, training=training)
-            attn_output = self.layernorm1(x + attn_output)
-            # Feed Forward Network
-            ffn_output = self.dense1(attn_output)
-            ffn_output = self.dense2(ffn_output)
-            ffn_output = self.dropout2(ffn_output, training=training)
-            ffn_output = self.layernorm2(attn_output + ffn_output)
-            x = ffn_output
-        return x
-
-
-def SSViT(
-    WS,
-    k,
-    Num_Classes,
-    num_transformer_layers=4,
-    num_heads=8,
-    dff=4 * 64,
-    dropout_rate=0.1,
-    layernorm_eps=1e-3,
-):
-    input_shape = (WS, WS, k)
-    max_patch_size = min(input_shape[:3])
-    patch_size = max_patch_size
-    num_patches = (
-        (input_shape[0] // patch_size)
-        * (input_shape[1] // patch_size)
-        * (input_shape[2] // patch_size)
-    )
-    embedding_dim = 64
-    inputs = Input(shape=input_shape, name="inputs")
-    x = tf.expand_dims(inputs, axis=1)  # add this line
-    # Create a patch embedding layer
-    patch_embed = Conv3D(
-        embedding_dim,
-        kernel_size=(1, patch_size, patch_size),
-        strides=(1, patch_size, patch_size),
-        padding="valid",
-        name="patch_embed",
-    )(x)
-    cls_token = tf.Variable(tf.zeros((1, 1, 1, embedding_dim)), name="cls_token")
-    # Add cls_token to patch embeddings
-    patch_embed = tf.concat(
-        [
-            tf.broadcast_to(
-                cls_token, [tf.shape(patch_embed)[0], 1, 1, 1, embedding_dim]
-            ),
-            patch_embed,
-        ],
-        axis=1,
-    )
-    # Add positional encoding to patch embeddings
-    pos_encoding = get_positional_encoding_ssvit(num_patches + 1, embedding_dim)
-    patch_embed = patch_embed + pos_encoding
-    # Create a Transformer_SSViT encoder
-    for i in range(num_transformer_layers):
-        if i == 0:
-            transformer_layer = Transformer_SSViT(
-                num_heads=num_heads,
-                transformer_layer_depth=1,
-                d_model=embedding_dim,
-                dff=dff,
-                name=f"transformer_layer_{i}",
-            )(patch_embed)
-        else:
-            transformer_layer = Transformer_SSViT(
-                num_heads=num_heads,
-                transformer_layer_depth=1,
-                d_model=embedding_dim,
-                dff=dff,
-                name=f"transformer_layer_{i}",
-            )(transformer_layer)
-
-    # Use cross-attention between the patch embeddings and a separate set of learnable embeddings
-    q = Dense(embedding_dim)(transformer_layer[:, 0, 0, 0])
-    k = Dense(embedding_dim)(patch_embed[:, 1:, :, :, :])
-    v = patch_embed[:, 1:, :, :, :]
-    cross_attn_output = tf.matmul(q[:, tf.newaxis, :], k, transpose_b=True)
-    cross_attn_output = cross_attn_output / tf.math.sqrt(
-        tf.cast(embedding_dim, dtype=tf.float32)
-    )
-    cross_attn_output = tf.nn.softmax(cross_attn_output, axis=-1)
-    cross_attn_output = tf.matmul(cross_attn_output, v)
-    # Concatenate cls_token and cross-attention output
-    output_layer = tf.concat(
-        [transformer_layer[:, 0, 0, 0], cross_attn_output[:, 0, 0, 0]], axis=-1
-    )
-    # Add a few dense layers and a final softmax layer
-    output_layer = Dense(dff, activation="relu")(output_layer)
-    output_layer = Dense(dff, activation="relu")(output_layer)
-    output_layer = Dense(Num_Classes, activation="softmax", name="output_layer")(
-        output_layer
-    )
-    # Define the model
-    model = Model(inputs=inputs, outputs=output_layer, name="SSViT")
-    return model
-# SSViT Ends
 #Diff- Former Starts
 class SWiGLU(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
@@ -666,517 +418,72 @@ def DSST(WS, k, Num_Classes, num_transformer_layers=2, num_heads=num_heads, dff=
     return model
 # Diff-Former Ends
 
-# SSMamba Starts
-# Token Generation
-class SpectralSpatialTokenGeneration(tf.keras.layers.Layer):
-    '''
-    token generation for spectral and spatial features
-    fully connected layer for spectral and spatial features
-    '''
-    def __init__(self, out_channels, **kwargs):
-        super(SpectralSpatialTokenGeneration, self).__init__(**kwargs)
-        self.spatial_tokens = Dense(out_channels)   # pytorch nn.Linear
-        self.spectral_tokens = Dense(out_channels)
-    def call(self, x):
-        B, H, W, C = x.shape
-        # Use tf.shape to handle dynamic batch dimension
-        spatial_tokens = self.spatial_tokens(tf.reshape(tf.transpose(x, [0, 2, 3, 1]), [tf.shape(x)[0], H * W, C]))
-        spectral_tokens = self.spectral_tokens(tf.reshape(tf.transpose(x, [0, 1, 2, 3]), [tf.shape(x)[0], H * W, C]))
-        return spatial_tokens, spectral_tokens
-# Spaital Spectral Mamba
-class SSMSpectralSpatialFeatureEnhancement(tf.keras.layers.Layer):
-    def __init__(self, out_channels, **kwargs):
-        super(SSMSpectralSpatialFeatureEnhancement, self).__init__(**kwargs)
-        self.spatial_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            Reshape((1, out_channels))
-        ])
-        self.spectral_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            Reshape((1, out_channels))
-        ])
-    def call(self, spatial_tokens, spectral_tokens, center_tokens):
-        spatial_enhanced = spatial_tokens * self.spatial_gate(center_tokens)
-        spectral_enhanced = spectral_tokens * self.spectral_gate(center_tokens)
-        return spatial_enhanced, spectral_enhanced
+#Model Complexity Calculation
+def count_model_parameters(model):
+    """Count parameters using the same Keras API used by the GitHub baseline.
 
-class SSMStateSpaceModel(tf.keras.layers.Layer):
-    def __init__(self, state_dim, **kwargs):
-        super(SSMStateSpaceModel, self).__init__(**kwargs)
-        self.state_dim = state_dim
-        self.state_transition = Dense(state_dim)
-        self.state_update = Dense(state_dim)
-    def call(self, x):
-        state = tf.zeros([tf.shape(x)[0], self.state_dim])
-        for t in range(tf.shape(x)[1]):
-            state = self.state_transition(state) + self.state_update(x[:, t, :])
-        return state
+    model.count_params() is the canonical total. Trainable and non-trainable
+    counts are reported separately so the result is auditable.
+    """
+    total = int(model.count_params())
+    trainable = int(sum(np.prod(weight.shape) for weight in model.trainable_weights))
+    non_trainable = int(sum(np.prod(weight.shape) for weight in model.non_trainable_weights))
 
-class SSMambaModel(tf.keras.Model):
-    def __init__(self, out_channels,state_dim, dropout=0.1, **kwargs):
-        super(SSMambaModel, self).__init__(**kwargs)
-        self.token_generation = SpectralSpatialTokenGeneration(out_channels)
-        # self.multi_head_attention = MultiHeadAttention(out_channels, num_heads, dropout)
-        self.feature_enhancement = SSMSpectralSpatialFeatureEnhancement(out_channels)
-        self.state_space_model = SSMStateSpaceModel(state_dim)
-        self.dense = Dense(units=128, activation="relu", kernel_regularizer=tf.keras.regularizers.l2(0.01))
-        self.dropout = Dropout(0.4)
-        self.classifier = Dense(Num_Classes, activation='softmax')
-    def call(self, x):
-        spatial_tokens, spectral_tokens = self.token_generation(x)
-        center_tokens = spatial_tokens[:, x.shape[1] // 2, :]
-        spatial_enhanced, spectral_enhanced = self.feature_enhancement(spatial_tokens, spectral_tokens, center_tokens)
-        fuesd_tokens = spatial_enhanced + spectral_enhanced
-        state_output = self.state_space_model(fuesd_tokens)
-        output = self.classifier(state_output)
-        return output
-    
-def SSM(Tr, batch_size):
-    model = SSMambaModel(
-        out_channels=32,
-        state_dim=64,
-        dropout=0.1
-    )
-    # Build the model by passing a batch of data
-    _ = model(Tr[:batch_size])  # Ensures model is built correctly
-    return model
+    if total != trainable + non_trainable:
+        raise RuntimeError(
+            "Keras parameter accounting mismatch: "
+            f"total={total}, trainable={trainable}, non_trainable={non_trainable}."
+        )
+
+    return {
+        "total": total,
+        "trainable": trainable,
+        "non_trainable": non_trainable,
+    }
 
 
-# Wave Mamba 
-class WaveSpectralSpatialFeatureEnhancement(tf.keras.layers.Layer):
-    def __init__(self, out_channels, **kwargs):  # Add 'self'
-        super(WaveSpectralSpatialFeatureEnhancement, self).__init__(**kwargs)
-        self.spatial_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            # Reshape the output to match spatial_tokens
-            Reshape((1, out_channels))
-        ])
-        self.spectral_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            # Reshape the output to match spectral_tokens
-            Reshape((1, out_channels))
-        ])
-    def call(self, spatial_tokens, spectral_tokens, center_tokens):
-        spatial_enhanced = spatial_tokens * self.spatial_gate(center_tokens)
-        spectral_enhanced = spectral_tokens * self.spectral_gate(center_tokens)
-        return spatial_enhanced, spectral_enhanced
+def get_flops(model, input_shape):
+    """Profile TensorFlow graph FLOPs for one input sample.
 
-class WaveStateSpaceModel(tf.keras.layers.Layer):
-    def __init__(self, state_dim, **kwargs):
-        super(WaveStateSpaceModel, self).__init__(**kwargs)
-        self.state_dim = state_dim
-        self.state_transition = Dense(units=state_dim, activation="relu")
-        self.state_update = Dense(units=state_dim, activation="relu")
-    def call(self, x):
-        state = tf.zeros([tf.shape(x)[0], self.state_dim])
-        for t in range(tf.shape(x)[1]):
-            # Flatten the input if it has more than 2 dimensions
-            input_t = tf.reshape(x[:, t, :], [tf.shape(x)[0], -1])
-            state = self.state_transition(state) + self.state_update(input_t)
-        return state
+    This replaces the previous hand-written layer counter, which double-counted
+    nested layers and missed/under-counted attention, Dense token positions,
+    Conv3D operations, and raw TensorFlow matmuls.
 
-class WaveSSMambaModel(tf.keras.Model):
-    def __init__(self, out_channels, num_heads, state_dim, Num_Classes, dropout=0.1, **kwargs):
-        super(WaveSSMambaModel, self).__init__(**kwargs)
-        self.token_generation = SpectralSpatialTokenGeneration(out_channels)
-        self.feature_enhancement = WaveSpectralSpatialFeatureEnhancement(out_channels)
-        self.state_space_model = WaveStateSpaceModel(state_dim)
-        self.dense = Dense(units=128, activation="relu", kernel_regularizer=tf.keras.regularizers.l2(0.01))
-        self.dropout = Dropout(0.4)
-        self.classifier = Dense(Num_Classes, activation='softmax')
-    def apply_wavelet_transform(self, image, wavelet_name='haar'):
-        """'haar', 'db1', 'db2', 'coif1', 'bior1.3'"""
-        image_np = tf.make_ndarray(tf.make_tensor_proto(image))
-        if wavelet_name not in pywt.wavelist(kind='discrete'):
-            raise ValueError(f"The wavelet {wavelet_name} is not supported for discrete wavelet transform.")
-        coeffs = pywt.dwt2(image_np, wavelet_name)
-        cA, (cH, cV, cD) = coeffs
-        transformed = np.stack([cA, cH, cV, cD], axis=-1)
-        return tf.convert_to_tensor(transformed, dtype=tf.float32)
-    def call(self, x):
-        spatial_tokens, spectral_tokens = self.token_generation(x)
-        center_tokens = spatial_tokens[:, x.shape[1] // 2, :]
-        spatial_tokens, spectral_tokens = self.feature_enhancement(spatial_tokens, spectral_tokens, center_tokens)
-        spatial_tokens = tf.map_fn(lambda t: tf.numpy_function(self.apply_wavelet_transform, [t], tf.float32), spatial_tokens, dtype=tf.float32)
-        spectral_tokens = tf.map_fn(lambda t: tf.numpy_function(self.apply_wavelet_transform, [t], tf.float32), spectral_tokens, dtype=tf.float32)
-        Combined_Tokens = tf.concat([spatial_tokens, spectral_tokens], axis=-1)
-        state_output = self.state_space_model(Combined_Tokens)
-        output = self.classifier(self.dense(state_output))
-        return output
+    Returns None when TensorFlow cannot freeze/profile a model graph.
+    """
+    if len(input_shape) != 3:
+        raise ValueError(f"Expected input_shape=(H, W, C), received {input_shape}.")
 
-def WaveMamba(Tr, batch_size, Num_Classes):
-    model = WaveSSMambaModel(out_channels=32, num_heads=num_heads, state_dim=64, Num_Classes=Num_Classes, dropout=0.1)
-    sample_input = Tr[:batch_size]
-    _ = model(sample_input)
-    return model
-# Wave Mamba Ends
+    try:
+        from tensorflow.python.framework.convert_to_constants import (
+            convert_variables_to_constants_v2,
+        )
 
-# Multihead Mamba Starts
-class MulMultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, embed_dim, num_heads, dropout=0.1, **kwargs): # Add 'self'
-        super(MulMultiHeadAttention, self).__init__(**kwargs)
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.head_dim = embed_dim // num_heads
-        self.all_head_size = self.num_heads * self.head_dim
+        input_spec = tf.TensorSpec(
+            shape=(1, *tuple(input_shape)),
+            dtype=tf.float32,
+            name="model_input",
+        )
+        concrete_function = tf.function(
+            lambda x: model(x, training=False)
+        ).get_concrete_function(input_spec)
+        frozen_function = convert_variables_to_constants_v2(concrete_function)
 
-        self.query = Dense(self.all_head_size)
-        self.key = Dense(self.all_head_size)
-        self.value = Dense(self.all_head_size)
-        self.dropout = Dropout(dropout)
-
-    def call(self, query, key, value):
-        batch_size = tf.shape(query)[0]
-
-        query_proj = self.query(query)
-        key_proj = self.key(key)
-        value_proj = self.value(value)
-
-        query_proj = tf.reshape(query_proj, [batch_size, -1, self.num_heads, self.head_dim])
-        query_proj = tf.transpose(query_proj, [0, 2, 1, 3])
-        key_proj = tf.reshape(key_proj, [batch_size, -1, self.num_heads, self.head_dim])
-        key_proj = tf.transpose(key_proj, [0, 2, 1, 3])
-        value_proj = tf.reshape(value_proj, [batch_size, -1, self.num_heads, self.head_dim])
-        value_proj = tf.transpose(value_proj, [0, 2, 1, 3])
-
-        attention_scores = tf.matmul(query_proj, key_proj, transpose_b=True) / tf.sqrt(tf.cast(self.head_dim, tf.float32))
-        attention_weights = tf.nn.softmax(attention_scores, axis=-1)
-        attention_output = tf.matmul(attention_weights, value_proj)
-
-        attention_output = tf.transpose(attention_output, [0, 2, 1, 3])
-        attention_output = tf.reshape(attention_output, [batch_size, -1, self.all_head_size])
-        attention_output = self.dropout(attention_output)
-
-        return attention_output
-
-class MulSpectralSpatialFeatureEnhancement(tf.keras.layers.Layer):
-    def __init__(self, out_channels, **kwargs):  # Add 'self'
-        super(MulSpectralSpatialFeatureEnhancement, self).__init__(**kwargs)
-        self.spatial_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            # Reshape the output to match spatial_tokens
-            Reshape((1, out_channels))
-        ])
-        self.spectral_gate = Sequential([
-            Dense(out_channels),
-            Activation('sigmoid'),
-            # Reshape the output to match spectral_tokens
-            Reshape((1, out_channels))
-        ])
-
-    def call(self, spatial_tokens, spectral_tokens, center_tokens):
-        spatial_enhanced = spatial_tokens * self.spatial_gate(center_tokens)
-        spectral_enhanced = spectral_tokens * self.spectral_gate(center_tokens)
-        return spatial_enhanced, spectral_enhanced
-
-class MulStateSpaceModel(tf.keras.layers.Layer):
-    def __init__(self, state_dim, **kwargs):  # Add 'self'
-        super(MulStateSpaceModel, self).__init__(**kwargs)
-        self.state_dim = state_dim
-        self.state_transition = Dense(state_dim)
-        self.state_update = Dense(state_dim)
-
-    def call(self, x):
-        state = tf.zeros([tf.shape(x)[0], self.state_dim])
-        for t in range(tf.shape(x)[1]):
-            state = self.state_transition(state) + self.state_update(x[:, t, :])
-        return state
-
-class MulSSMambaModel(tf.keras.Model):
-    def __init__(self, out_channels, num_heads, state_dim, dropout=0.1, **kwargs): # Pass out_channels to __init__
-        super(MulSSMambaModel, self).__init__(**kwargs)
-        self.token_generation = SpectralSpatialTokenGeneration(out_channels) # Use out_channels here
-        self.multi_head_attention = MulMultiHeadAttention(out_channels, num_heads, dropout)
-        self.feature_enhancement = MulSpectralSpatialFeatureEnhancement(out_channels)
-        self.state_space_model = MulStateSpaceModel(state_dim)
-        self.dense = Dense(units=128, activation="relu", kernel_regularizer=tf.keras.regularizers.l2(0.01))
-        self.dropout = Dropout(0.4)
-        self.classifier = Dense(Num_Classes, activation='softmax')
-
-    def call(self, x):
-        spatial_tokens, spectral_tokens = self.token_generation(x)
-        center_tokens = spatial_tokens[:, x.shape[1] // 2, :]
-        spatial_enhanced, spectral_enhanced = self.feature_enhancement(spatial_tokens, spectral_tokens, center_tokens)
-        attention_output = self.multi_head_attention(spatial_enhanced, spectral_enhanced, spectral_enhanced)
-        state_output = self.state_space_model(attention_output)
-        output = self.classifier(self.dense(state_output))
-        return output
-
-def MulMamba(Tr, batch_size):
-    model = MulSSMambaModel(out_channels=32, num_heads=num_heads, state_dim=64, dropout=0.1)
-    sample_input = Tr[:batch_size]
-    _ = model(sample_input)
-    return model
-# Multihead Mamba Ends
+        options = tf.compat.v1.profiler.ProfileOptionBuilder.float_operation()
+        options["output"] = "none"
+        profile = tf.compat.v1.profiler.profile(
+            graph=frozen_function.graph,
+            options=options,
+        )
+        return int(profile.total_float_ops) if profile is not None else None
+    except Exception as exc:
+        warnings.warn(f"FLOP profiling failed: {exc}")
+        return None
 
 
-# Flops Calculation
-def get_flops(model, input_shape=None):
-    total_flops = 0
+def compute_flops(model, input_shape):
+    return get_flops(model, input_shape)
 
-    # Build model with dummy input to infer shapes if input_shape is provided
-    if input_shape and isinstance(model, tf.keras.Model) and not model.built:
-        dummy_input = tf.keras.Input(shape=input_shape)
-        model(dummy_input)
-
-    
-
-    def process_layer(layer, input_shape=None):
-        nonlocal total_flops
-        flops = 0
-
-        # Helper to get input/output shapes
-        def get_shapes(layer):
-            in_shape = layer.input_shape if hasattr(layer, 'input_shape') else input_shape
-            out_shape = layer.output_shape if hasattr(layer, 'output_shape') else None
-            return in_shape, out_shape
-
-        # Handle Conv2D layers
-        if isinstance(layer, tf.keras.layers.Conv2D):
-            in_shape, out_shape = get_shapes(layer)
-            if in_shape and out_shape:
-                input_channels = in_shape[-1]
-                output_height = out_shape[1]
-                output_width = out_shape[2]
-                kernel_size = layer.kernel_size[0] * layer.kernel_size[1] * input_channels
-                flops += kernel_size * output_height * output_width * layer.filters * 2
-                if layer.activation is not None and layer.activation.__name__ != 'linear':
-                    flops += output_height * output_width * layer.filters
-
-        # Handle Conv3D layers
-        elif isinstance(layer, tf.keras.layers.Conv3D):
-            in_shape, out_shape = get_shapes(layer)
-            if in_shape and out_shape:
-                input_channels = in_shape[-1]
-                output_depth = out_shape[1]
-                output_height = out_shape[2]
-                output_width = out_shape[3]
-                kernel_size = layer.kernel_size[0] * layer.kernel_size[1] * layer.kernel_size[2] * input_channels
-                flops += kernel_size * output_depth * output_height * output_width * layer.filters * 2
-                if layer.activation is not None and layer.activation.__name__ != 'linear':
-                    flops += output_depth * output_height * output_width * layer.filters
-
-        # Handle Dense layers
-        elif isinstance(layer, tf.keras.layers.Dense):
-            in_shape, out_shape = get_shapes(layer)
-            input_dim = layer.get_weights()[0].shape[0] if layer.get_weights() else in_shape[-1] if in_shape else 0
-            output_dim = layer.units
-            flops += 2 * input_dim * output_dim  # Multiplications + additions
-            if layer.activation is not None and layer.activation.__name__ != 'linear':
-                flops += output_dim  # Approximate activation cost
-
-        # AttenctionGCN Flops
-         # Handle Reshape layers
-        elif isinstance(layer, tf.keras.layers.Reshape):
-            flops += 0  # Reshape is just memory rearrangement, negligible FLOPs
-        # Handle Flatten layers
-        elif isinstance(layer, tf.keras.layers.Flatten):
-            flops += 0  # Flatten is just memory rearrangement, negligible FLOPs
-        # Handle concatenate layers
-        elif isinstance(layer, tf.keras.layers.Concatenate):
-            flops += 0  # Concatenate is just memory copying, negligible FLOPs
-        # Handle cot_attention (custom attention layer)
-        elif layer.__class__.__name__ == 'cot_attention':  # Assuming cot_attention is a custom layer
-            in_shape, out_shape = get_shapes(layer)
-            if in_shape and out_shape:
-                height, width, channels = in_shape[1], in_shape[2], in_shape[3]
-                # Assume cot_attention uses a 3x3 convolution to compute attention scores
-                kernel_size = 3 * 3 * channels  # 3x3 kernel
-                attention_flops = kernel_size * height * width * channels * 2  # Conv for attention scores
-                # Softmax approximation
-                attention_flops += height * width * channels  # One operation per element
-                # Weighted sum (attention weights * input)
-                attention_flops += 2 * height * width * channels * height * width  # Matrix multiplication
-                flops += attention_flops
-        # Handle LayerNormalization
-        elif isinstance(layer, tf.keras.layers.LayerNormalization):
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                flops += 5 * np.prod(in_shape[1:])  # Mean, variance, scale, shift, normalize
-        # Handle Dropout (negligible FLOPs)
-        elif isinstance(layer, tf.keras.layers.Dropout):
-            flops += 0
-        # Handle functional model operations
-        elif isinstance(layer, tf.keras.Model):
-            for sublayer in layer.layers:
-                if sublayer.name.startswith('concatenate'):
-                    flops += 0  # Negligible
-                else:
-                    flops += process_layer(sublayer, input_shape)
-
-        # Handle MultiHeadAttention layers
-        elif isinstance(layer, tf.keras.layers.MultiHeadAttention):
-            in_shape, _ = get_shapes(layer)
-            embed_dim = layer._key_dim * layer._num_heads  # Use _num_heads
-            seq_len = in_shape[-2] if in_shape and len(in_shape) > 2 else 0
-            if seq_len:
-                # Q, K, V projections
-                flops += 3 * (2 * embed_dim * embed_dim * seq_len)  # Three dense layers
-                # Scaled dot-product attention
-                flops += 2 * layer._num_heads * seq_len * seq_len * (embed_dim // layer._num_heads)  # QK^T matmul
-                flops += layer._num_heads * seq_len * seq_len  # Softmax (approx)
-                flops += 2 * layer._num_heads * seq_len * seq_len * (embed_dim // layer._num_heads)  # Attention * V
-                # Output projection
-                flops += 2 * embed_dim * embed_dim * seq_len
-
-        # Handle Transformer/Transformer_SSViT layers
-        elif isinstance(layer, (Transformer, Transformer_SSViT)):
-            for _ in range(layer.transformer_layer_depth):
-                flops += process_layer(layer.mha, input_shape)
-                flops += process_layer(layer.dropout1, input_shape)
-                flops += process_layer(layer.layernorm1, input_shape)
-                flops += process_layer(layer.dense1, input_shape)
-                flops += process_layer(layer.dense2, input_shape)
-                flops += process_layer(layer.dropout2, input_shape)
-                flops += process_layer(layer.layernorm2, input_shape)
-
-        # Handle LayerNormalization
-        elif isinstance(layer, tf.keras.layers.LayerNormalization):
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                flops += 5 * np.prod(in_shape[1:])  # Mean, variance, scale, shift, normalize
-
-        # Handle Dropout (negligible FLOPs)
-        elif isinstance(layer, tf.keras.layers.Dropout):
-            flops += 0
-
-        # Handle MulMultiHeadAttention
-        elif isinstance(layer, MulMultiHeadAttention):
-            flops += process_layer(layer.query)  # Dense layer
-            flops += process_layer(layer.key)    # Dense layer
-            flops += process_layer(layer.value)  # Dense layer
-            flops += process_layer(layer.dropout)  # Dropout layer (typically 0 FLOPs)
-            # Add FLOPs for attention computation
-            batch_size = 1  # Assume batch_size=1 for simplicity; adjust if known
-            seq_len = layer.embed_dim // layer.num_heads  # Approximation
-            flops += (2 * batch_size * layer.num_heads * seq_len * seq_len)  # QK^T matmul
-            flops += (batch_size * layer.num_heads * seq_len * seq_len)      # Softmax (approx.)
-            flops += (2 * batch_size * layer.num_heads * seq_len * seq_len)
-            
-        # Handle MulSpectralSpatialFeatureEnhancement
-        elif isinstance(layer, MulSpectralSpatialFeatureEnhancement):
-            flops += process_layer(layer.spatial_gate, input_shape)
-            flops += process_layer(layer.spectral_gate, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                seq_len = in_shape[1] if len(in_shape) > 1 else 1
-                out_channels = layer.spatial_gate.layers[0].units
-                flops += 2 * in_shape[0] * seq_len * out_channels  # spatial_tokens * gate, spectral_tokens * gate
-         # Handle MulStateSpaceModel
-        elif isinstance(layer, MulStateSpaceModel):
-            flops += process_layer(layer.state_transition, input_shape)
-            flops += process_layer(layer.state_update, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                seq_len = in_shape[1] if len(in_shape) > 1 else 1
-                flops += seq_len * (flops + in_shape[0] * layer.state_dim)  # State updates per timestep
-
-        # Handle WaveSpectralSpatialFeatureEnhancement
-        elif isinstance(layer, WaveSpectralSpatialFeatureEnhancement):
-            flops += process_layer(layer.spatial_gate, input_shape)
-            flops += process_layer(layer.spectral_gate, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                seq_len = in_shape[1] if len(in_shape) > 1 else 1
-                out_channels = layer.spatial_gate.layers[0].units
-                flops += 2 * in_shape[0] * seq_len * out_channels  # spatial_tokens * gate, spectral_tokens * gate
-        # Handle WaveStateSpaceModel
-        elif isinstance(layer, WaveStateSpaceModel):
-            flops += process_layer(layer.state_transition, input_shape)
-            flops += process_layer(layer.state_update, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                seq_len = in_shape[1] if len(in_shape) > 1 else 1
-                flops += seq_len * (flops + in_shape[0] * layer.state_dim)  # State updates per timestep
-
-        # Handle WaveSSMambaModel
-        elif isinstance(layer, WaveSSMambaModel):
-            flops += process_layer(layer.token_generation, input_shape)
-            flops += process_layer(layer.feature_enhancement, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                batch_size = in_shape[0]
-                height = in_shape[1]
-                width = in_shape[2]
-                channels = in_shape[3] if len(in_shape) > 3 else 1
-                wavelet_flops_per_pixel = 8
-                flops_per_transform = wavelet_flops_per_pixel * height * width * channels
-                num_tokens = height
-                flops += 2 * batch_size * num_tokens * flops_per_transform  # 2x for spatial and spectral
-            flops += process_layer(layer.state_space_model, input_shape)
-            flops += process_layer(layer.dense, input_shape)
-            flops += process_layer(layer.dropout, input_shape)
-            flops += process_layer(layer.classifier, input_shape)
-
-        # Handle SSMambaModel
-        elif isinstance(layer, SSMambaModel):
-            flops += process_layer(layer.token_generation, input_shape)
-            flops += process_layer(layer.feature_enhancement, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                batch_size = in_shape[0]
-                height = in_shape[1]
-                width = in_shape[2]
-                channels = in_shape[3] if len(in_shape) > 3 else 1
-                wavelet_flops_per_pixel = 8
-                flops_per_transform = wavelet_flops_per_pixel * height * width * channels
-                num_tokens = height
-                flops += 2 * batch_size * num_tokens * flops_per_transform  # 2x for spatial and spectral
-            flops += process_layer(layer.state_space_model, input_shape)
-            flops += process_layer(layer.dense, input_shape)
-            flops += process_layer(layer.dropout, input_shape)
-            flops += process_layer(layer.classifier, input_shape)
-            
-        elif isinstance(layer, SSMSpectralSpatialFeatureEnhancement):
-            flops += process_layer(layer.spatial_gate, input_shape)
-            flops += process_layer(layer.spectral_gate, input_shape)
-            in_shape, _ = get_shapes(layer)
-            if in_shape:
-                seq_len = in_shape[1] if len(in_shape) > 1 else 1
-                out_channels = layer.spatial_gate.layers[0].units
-                flops += 2 * in_shape[0] * seq_len * out_channels
-        # Handle functional model operations
-        elif isinstance(layer, tf.keras.Model):
-            for sublayer in layer.layers:
-                if sublayer.name.startswith('add'):  # Positional encoding addition
-                    in_shape = sublayer.input_shape[0] if sublayer.input_shape else None
-                    if in_shape:
-                        flops += np.prod(in_shape[1:])  # Element-wise addition
-                elif sublayer.name.startswith('matmul'):  # Cross-attention matmul
-                    in_shape_1 = sublayer.input_shape[0] if sublayer.input_shape else None
-                    in_shape_2 = sublayer.input_shape[1] if sublayer.input_shape and len(sublayer.input_shape) > 1 else None
-                    if in_shape_1 and in_shape_2:
-                        flops += 2 * in_shape_1[-1] * in_shape_2[-1] * in_shape_1[-2]  # Matmul
-                elif sublayer.name.startswith('softmax'):  # Cross-attention softmax
-                    in_shape = sublayer.input_shape if sublayer.input_shape else None
-                    if in_shape:
-                        flops += np.prod(in_shape[1:])  # Approximate softmax
-                elif sublayer.name.startswith('concatenate'):  # Concatenation
-                    flops += 0  # Negligible
-                elif sublayer.name.startswith('expand_dims'):  # tf.expand_dims
-                    flops += 0  # Negligible
-                else:
-                    flops += process_layer(sublayer, input_shape)
-
-        # Handle Sequential or nested models
-        elif isinstance(layer, tf.keras.Sequential) or hasattr(layer, 'layers'):
-            for sublayer in layer.layers:
-                flops += process_layer(sublayer, input_shape)
-      
-        total_flops += flops
-        print(f"Layer {layer.name}: {flops:,} FLOPs")
-        return flops
-
-    process_layer(model)
-    return total_flops
-
-def compute_flops(model):
-    return get_flops(model)   
 
 # Train and Evaluate Model
 def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output_dir, HSID, teRatio, k, WS, DLM, RDHSI, GT,Num_Classes,batch_size,epochs, target_names):
@@ -1185,15 +492,32 @@ def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output
     os.makedirs(output_dir, exist_ok=True)
     print(model_name.__name__)
     input_shape = (WS, WS, k)  # Define the input shape for the model
-    if model_name == WaveMamba:
-        Tr = Tr.reshape(-1, WS, WS, k)
-        Va = Va.reshape(-1, WS, WS, k)
-        Te = Te.reshape(-1, WS, WS, k)
-        model = WaveMamba(Tr, batch_size, Num_Classes)
-    elif model_name == MulMamba:
-        model = MulMamba(Tr, batch_size)
-    elif model_name == SSM:
-        model = SSM(Tr, batch_size)
+    # if model_name == WaveMamba:
+    #     Tr = Tr.reshape(-1, WS, WS, k)
+    #     Va = Va.reshape(-1, WS, WS, k)
+    #     Te = Te.reshape(-1, WS, WS, k)
+    #     model = WaveMamba(Tr, batch_size, Num_Classes)
+    if model_name == WaveFormer:
+      # Transform Training/Validation/Test samples
+      Tr = Tr.reshape(-1, WS, WS, k)
+      Va = Va.reshape(-1, WS, WS, k)
+      Te = Te.reshape(-1, WS, WS, k)
+      Tr = wavelet_transform_image(Tr)
+      Va = wavelet_transform_image(Va)
+      Te = wavelet_transform_image(Te)
+      model = WaveFormer(WS, k, Num_Classes)
+    elif model_name == SSFormer:
+      # Transform Training/Validation/Test samples
+      Tr = Tr.reshape(-1, WS, WS, k)
+      Va = Va.reshape(-1, WS, WS, k)
+      Te = Te.reshape(-1, WS, WS, k)
+      model = SSFormer(WS, k, Num_Classes)
+    elif model_name == PyFormer:
+      # Transform Training/Validation/Test samples
+      Tr = Tr.reshape(-1, WS, WS, k)
+      Va = Va.reshape(-1, WS, WS, k)
+      Te = Te.reshape(-1, WS, WS, k)
+      model = PyFormer(WS, k, Num_Classes)
     else:
         model = model_name(WS,k,Num_Classes)
     # Calling Custom Model
@@ -1201,13 +525,20 @@ def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output
     file_name = f"{HSID}_{teRatio}_{k}_{WS}_{DLM}_model_summary_of_{model_name.__name__}.txt"
     # Assuming `model` is your Keras model
     total_params = model.count_params()
+    parameter_stats = count_model_parameters(model)
     # flops = get_flops(model)
     flops = get_flops(model, input_shape=input_shape)
     with open(os.path.join(output_dir, file_name),'w') as fh:
         # Pass the file handle in as a lambda function to make it callable
         model.summary(print_fn=lambda x: fh.write(x + '\n'))
         fh.write(f"\nTotal Parameters: {total_params}\n")
-        fh.write(f"Total FLOPs: {flops}\n")
+        fh.write(f"\nTotal Parameters: {parameter_stats['total']}\n")
+        fh.write(f"Trainable Parameters: {parameter_stats['trainable']}\n")
+        fh.write(f"Non-trainable Parameters: {parameter_stats['non_trainable']}\n")
+        fh.write("FLOPs (batch=1): "
+            + (str(flops) if flops is not None else "NA")
+            + "\n"
+        )
         
     # Compiling the model
     model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
@@ -1239,29 +570,31 @@ def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output
     # PLot the Ground Truth value
     # outputs = GT_Plot(CRDHSI, GT, model, WS, k)
     plt.figure(figsize=(10, 10))
-    plt.imshow(GT, cmap='jet')
+    plt.imshow(GT, cmap='nipy_spectral')
     plt.axis('off')
     file_name = f"{HSID}_{trRatio}_{k}_{WS}_{DLM}_Ground_Truths.png"
     plt.savefig(os.path.join(output_dir, file_name), dpi=500, format='png', bbox_inches='tight', pad_inches=0)
     # Ground Truths
     outputs = GT_Plot(CRDHSI, GT, model, WS, k)
     plt.figure(figsize=(10, 10))
-    plt.imshow(outputs, cmap='jet')
+    plt.imshow(outputs, cmap='nipy_spectral')
     plt.axis('off')
     file_name = f"{HSID}_{trRatio}_{k}_{WS}_{DLM}_Ground_Truths.png"
     plt.savefig(os.path.join(output_dir, file_name), dpi=500, format='png', bbox_inches='tight', pad_inches=0)
 
-    return history, Tr_Time,Te_Time, oa, aa,kappa, total_params
+    return history, Tr_Time,Te_Time, oa, aa,kappa, total_params, parameter_stats, flops
 
 # # Define a list of model names
-model_names = [AttentionGCN,DSST,Hybrid_ViT,SSViT,SSM,MulMamba,WaveMamba] #[DSST] 
+model_names = [WaveFormer] #[DSST] 
 # Loop over the model names and run train_and_evaluate_model() for each model
 all_results = {}
 history_list = []
 Tr_Time_list= []
 Te_Time_list= []
 for model_name in model_names:
-    history, Tr_Time,Te_Time, oa, aa,kappa, total_params = train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output_dir, HSID, teRatio, k, WS, DLM, RDHSI, GT, Num_Classes, batch_size, epochs, target_names)
+    history, Tr_Time,Te_Time, oa, aa,kappa, total_params, parameter_stats, flops = train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, output_dir, HSID,
+                                                                                    teRatio, k, WS, DLM, RDHSI, GT, Num_Classes,
+                                                                                    batch_size, epochs, target_names)
     history_list.append(history)
     Tr_Time_list.append(Tr_Time)
     Tr_Time_list.append(Te_Time)
@@ -1275,7 +608,11 @@ for model_name in model_names:
         "Overall Accuracy": oa,
         "Average Accuracy": aa,
         "Kappa": kappa,
-        "Training Parameters": total_params,
+        "Total Param": total_params,
+        "Total Parameters": parameter_stats["total"],
+        "Trainable Parameters": parameter_stats["trainable"],
+        "Non-trainable Parameters": parameter_stats["non_trainable"],
+        "FLOPs (batch=1)": flops,
     }
 
 # Define the filename for all results

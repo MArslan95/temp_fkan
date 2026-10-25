@@ -1,1 +1,9 @@
-All\ res/
+datasets/
+*.log
+*.ckpt  
+All res/
+paper/
+.vscode/
+__pycache__/
+models/
+results_*/
