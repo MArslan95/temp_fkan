@@ -1,0 +1,33 @@
+Model: "ss_mamba_model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ spectral_spatial_wave_toke  multiple                  1024      
+ n_generation (SpectralSpat                                      
+ ialWaveTokenGeneration)                                         
+                                                                 
+ spectral_spatial_feature_e  multiple                  2112      
+ nhancement (SpectralSpatia                                      
+ lFeatureEnhancement)                                            
+                                                                 
+ state_space_mode (StateSpa  multiple                  13440     
+ ceMode)                                                         
+                                                                 
+ dense_6 (Dense)             multiple                  0 (unused)
+                                                                 
+ dropout (Dropout)           multiple                  0 (unused)
+                                                                 
+ dense_7 (Dense)             multiple                  1040      
+                                                                 
+=================================================================
+Total params: 17616 (68.81 KB)
+Trainable params: 17616 (68.81 KB)
+Non-trainable params: 0 (0.00 Byte)
+_________________________________________________________________
+
+Total Parameters: 17616
+
+Total Parameters: 17616
+Trainable Parameters: 17616
+Non-trainable Parameters: 0
+FLOPs (batch=1): 299073

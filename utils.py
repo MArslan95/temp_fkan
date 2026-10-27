@@ -1,9 +1,4 @@
 import os,argparse, json
-<<<<<<< HEAD
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
-=======
-# os.environ["CUDA_VISIBLE_DEVICES"]="0"
->>>>>>> 20cea71 (initial_code)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -98,11 +93,8 @@ def ClassificationReports(TeC, Te_Pred, target_names,zero_division=0):
 
 
 ## Writing Results in CSV files
-<<<<<<< HEAD
-def CSVResults(file_name, classification, confusion, Tr_Time, Te_Time, DL_Time, kappa, oa, aa, each_acc):
-=======
+
 def CSVResults(file_name, classification, confusion, Tr_Time, Te_Time, DL_Time, kappa, oa, aa, each_acc, memory_used=None):
->>>>>>> 20cea71 (initial_code)
     '''
     결과 csv 파일에 쓰기
     file_name: str : file name
@@ -131,12 +123,9 @@ def CSVResults(file_name, classification, confusion, Tr_Time, Te_Time, DL_Time, 
       CSV_file.write('\n')
       CSV_file.write('{} Average accuracy (%)'.format(aa))
       CSV_file.write('\n')
-<<<<<<< HEAD
-=======
       if memory_used is not None:
-            CSV_file.write('{} Inference Memory Usage (MB)\n'.format(round(memory_used, 2)))
-      CSV_file.write('\n')
->>>>>>> 20cea71 (initial_code)
+                    CSV_file.write('{} Inference Memory Usage (MB)\n'.format(round(memory_used, 2)))
+                    CSV_file.write('\n')
       CSV_file.write('{}'.format(classification))
       CSV_file.write('\n')
       CSV_file.write('{}'.format(each_acc))
@@ -198,27 +187,3 @@ def GT_Plot(CRDHSI, GT, model, WS, k):
                 outputs[AA][BB] = Predicted[count]
                 count = count+1
     return outputs
-<<<<<<< HEAD
-=======
-
-# def Custom_GT_Plot(CRDHSI, GT, model, WS, k):
-#     '''
-#     GT plot function?
-#     CRDHSI: np.array : data
-#     GT: np.array : ground truth
-#     model: keras model : keras model
-#     WS: int : window size
-#     k: int : number of bands
-#     '''
-#     Predicted = model.predict(CRDHSI)
-#     Predicted = np.argmax(Predicted, axis=1)
-#     height, width = np.shape(GT)
-#     ## Calculate the predicted Ground Truths
-#     outputs = np.zeros((height, width))
-#     count = 0
-#     for AA in range(height):
-#         for BB in range(width):
-#                 outputs[AA][BB] = Predicted[count]
-#                 count = count+1
-#     return outputs
->>>>>>> 20cea71 (initial_code)
