@@ -1,0 +1,175 @@
+\documentclass[a4paper,onecolumn,11pt]{IEEEtran}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \usepackage{graphicx}
+\usepackage{amsmath, amssymb}
+% \usepackage{caption, subcaption}
+% \usepackage{float}
+% \usepackage{multirow}
+% \usepackage{hyperref}
+\usepackage{soul,color}
+\usepackage{xcolor}
+\usepackage{setspace}
+
+\definecolor{reviewgreen}{RGB}{0,128,0}
+
+
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\newcommand{\pending}[1]{\par\noindent\textcolor{red!70!black}{\textbf{Pending evidence:} #1}\par}
+\begin{document}
+\noindent\textbf{WORKING REVISION DRAFT -- NOT READY FOR SUBMISSION}
+
+\noindent\textbf{Original Manuscript ID:} Access-2026-42627
+
+\noindent\textbf{Article:} FKANMamba: FastKAN-Enhanced State Space Learning for Spectral-Spatial Hyperspectral Image Classification
+
+Dear Editor and Reviewers,
+
+Thank you for reviewing our manuscript. We provide a point-by-point response below. The revised working manuscript clarifies the implemented architecture and the scope of the historical evaluation. Reviewer comments are reproduced in green and author responses are in black. Changes to the manuscript are marked with a yellow background.
+
+This working draft explicitly identifies experiments and release actions that remain pending. It must not be submitted until those entries have been replaced with verified evidence and final manuscript page numbers. We do not claim that the new experiments have already been completed.
+
+Sincerely,\\
+The authors
+\newpage
+% CONCERN-ID: R1-C1
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#1: Please describe the sampling and validation procedure more explicitly. Section III gives a 5\% training, 5\% validation, and 90\% testing split, but should also state how pixel centers are selected, how validation informs model selection, and which pixels are used to fit PCA and normalization. Since the inputs are overlapping patches, distinct center labels do not necessarily imply independent neighborhoods. If the splits are spatially interleaved, describe the results as within-scene classification and acknowledge the limitation. Spatially separated testing and repeated runs would be useful directions for future validation. }}
+
+\textbf{Author response:}
+The historical study used stratified random sampling of labeled pixel centers within each scene. Patches were constructed before partitioning, so distinct center indices do not imply independent neighborhoods. PCA with whitening was fitted to the complete scene before splitting; this transductive preprocessing is now disclosed. Validation accuracy and loss were monitored, but the inspected training script evaluated the final epoch rather than selecting a validation-best checkpoint. We therefore restrict the interpretation of the historical scores to within-scene classification.
+
+\textbf{Author action:}
+Revised the experimental protocol and added an explicit evaluation limitation in Sections III and VI. Section V.E specifies training-only PCA, five pipeline repetitions, and a buffered spatial protocol for the new study. \pending{The five-seed and spatial tables require completed runs; the historical table values are not repeated-run estimates.}
+
+\vspace{1.5em}
+% CONCERN-ID: R1-C2
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#2: Please make the relationship to Mamba precise. Equation 18 describes a fixed-matrix affine recurrence, whereas the cited Mamba paper emphasizes input-dependent state-space parameters. State whether the equation matches the implementation and describe the module as a linear recurrent state-space aggregator if that is what is used. This is a valid architectural choice, but should not be presented as equivalent to selective Mamba. The current experiments support the complete model more directly than the independent benefit of the recurrent stage. An isolated comparison with simple pooling could be left to future work.}}
+
+\textbf{Author response:}
+The reviewer is correct. The implemented recurrence uses two biased dense maps with parameters shared over token positions and no recurrent activation. It is an affine linear recurrent state-space aggregator, not a selective Mamba block: it does not compute input-dependent state-space parameters. We have made this distinction explicit while retaining FKANMamba as the model identifier. The existing results establish performance of the complete model, not a separate benefit of recurrence.
+
+\textbf{Author action:}
+Revised Section II.E and the architectural claims. Added mean-pooling and selective-Mamba aggregation controls to Section V.E. \pending{The aggregation controls have not yet supplied experimental evidence of an independent recurrent-stage benefit.}
+
+\vspace{1.5em}
+% CONCERN-ID: R1-C3
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#3: Please complete the implementation and ablation descriptions. Give the reshape and permutation steps in Section II.A, the token correspondence at fusion, the scan order, and the representative-token index for the even-sized patches. Report the RBF basis count and grid range, attention output dimension, and branch weight sharing. Also explain the difference between no attention in Table 7 and without FSSA in Table 8, which obtain different HC accuracies. The variants may reasonably differ, but readers need to know what each retains or substitutes.}}
+
+\textbf{Author response:}
+Section II.A now gives the exact transpose/reshape operations and coordinate mapping. Fusion pairs equal sequence indices, not necessarily equal physical pixels. The scan visits indices 0 through 143, and FEB uses zero-based index 6 for a 12 by 12 patch. We specify eight RBF centers initialized over [-1,1], trainable grid centers, 32 output channels, eight heads, independent token projections and FEB gates, and shared FSSA weights across the branches. The difference between the historical NA and without-FSSA configurations cannot be established from their table values alone.
+
+\textbf{Author action:}
+Revised Sections II.A--II.E and annotated the historical attention/module tables. Defined a reproducible without-FSSA variant that bypasses attention while retaining FEB, fusion, and recurrence. \pending{Recover the original NA configuration or replace the untraceable comparison with new controlled results. No architectural explanation for its different HC score is asserted.}
+
+\vspace{1.5em}
+% CONCERN-ID: R1-C4
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#4: Please distinguish parameter efficiency from runtime efficiency. The model is substantially smaller than the listed Transformer and KAN baselines, but not smaller than the listed Mamba baselines. Figure 7 measures the effect of changing the training ratio within FKANMamba, not its speed relative to other models. Equation 13 also retains quadratic attention, despite the linear scan that follows. Limiting the efficiency claims to the compact parameter count and the measured training-ratio tradeoff would be sufficient without requiring a new deployment study. }}
+
+\textbf{Author response:}
+We agree that parameter count is distinct from runtime and memory efficiency. The model has fewer parameters than the listed Transformer/KAN baselines but is not the smallest among the listed Mamba-labeled baselines. The attention stages retain quadratic token interactions; a subsequent linear-length scan does not make the complete model linear in sequence length. The training-ratio figure measures a within-model trade-off rather than a speed comparison between methods.
+
+\textbf{Author action:}
+Restricted the efficiency claims in the abstract, results, and conclusion, and added complexity accounting in Section II.E. \pending{The controlled runtime, memory, and FLOPs table requested by R2-C3 remains to be measured.}
+
+\vspace{1.5em}
+% CONCERN-ID: R1-C5
+{\color{reviewgreen}\textbf{Reviewer \#1, Concern \#5: As a minor correction, the HH discussion reports a 1.90 percentage-point OA improvement over SSF, while Table 3 gives 98.63\% and 95.83\%, a difference of 2.80 points. Please check these numerical summaries and improve the readability of the classification-map labels. }}
+
+\textbf{Author response:}
+The HH difference is 98.63 - 95.83 = 2.80 percentage points, rather than 1.90 percentage points. The revised discussion uses the correct difference and distinguishes absolute percentage-point gains from relative percentage changes.
+
+\textbf{Author action:}
+Corrected the HH discussion. Added enlarged external panel labels to revision-specific classification figures when the panel order can be read from the source figure. \pending{Final numerical and visual checks must also cover any replacement results and classification maps.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C1
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#1: Potential spatial information leakage: The manuscript employs a 5\%/5\%/90\% training, validation, and testing partition while extracting overlapping $12\times12$ hyperspectral patches. The authors should clarify whether the partitioning was performed randomly at the pixel level or using spatially independent regions. Overlapping patches may introduce substantial spatial information leakage and lead to optimistic classification results. Additional experiments using spatially disjoint training and testing regions are strongly recommended. }}
+
+\textbf{Author response:}
+The original partition is pixel-center random sampling, not spatially independent sampling. Its overlapping neighborhoods and full-scene PCA can yield optimistic within-scene estimates. The revised manuscript states this limitation. The additional protocol assigns spatial blocks before patch extraction and excludes centers whose full patch support crosses a partition boundary; PCA is fitted only to training-center spectra.
+
+\textbf{Author action:}
+Added the spatial protocol and support-disjointness checks in Section V.E, with HC and HH selected in advance for the spatial comparison. \pending{Spatial classification results over all five seed configurations are not yet available. This concern is not considered experimentally resolved.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C2
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#2: Clarification of the state-space architecture: Equations (17) and (18) describe a recurrent update based on learnable dense transformations. The authors should explain how this formulation relates to the selective state-space mechanisms used in conventional Mamba architectures. The differences between the proposed recurrent module, a standard linear recurrent network, and a conventional Mamba block should be explicitly established. }}
+
+\textbf{Author response:}
+The proposed recurrence is mathematically an affine linear recurrent network: the hidden state and input each undergo a biased dense map, whose outputs are added. It is also a non-selective state-space recurrence with fixed learned matrices. Conventional selective Mamba additionally generates input-dependent selection parameters and uses a specialized scan implementation. Those mechanisms are absent from the submitted recurrence. We no longer claim architectural equivalence.
+
+\textbf{Author action:}
+Revised Section II.E to specify both biases, the shared matrices, zero initial state, final-state readout, and the absence of recurrent nonlinearity or selective parameters. Clarified that FKANMamba is the retained model name.
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C3
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#3: Computational efficiency: The manuscript emphasizes parameter efficiency, but parameter count alone does not adequately characterize computational complexity. The authors should provide FLOPs, inference latency, GPU memory consumption, and training-time comparisons under consistent hardware and implementation conditions. The quadratic computational characteristics of the attention component should also be discussed. }}
+
+\textbf{Author response:}
+Parameter count alone does not establish computational efficiency. We now distinguish quadratic attention cost, RBF projection cost, and the affine recurrent scan. The historical custom FLOPs routine omitted important operations, so its totals are not used as evidence of comparative efficiency. The new profiling protocol uses the same device, precision, batch sizes, warm-up, synchronization, and clearly identified implementations.
+
+\textbf{Author action:}
+Added the profiling specification in Section V.E. \pending{Populate the comparison with measured FLOPs/operation coverage, batch-1 latency, batch-56 throughput, peak training/inference memory, epoch time, and total training time. No comparative speed claim is made before these measurements exist.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C4
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#4: Statistical reliability:The experimental results are reported without sufficient information about variability across independent training runs. The authors should repeat the experiments using multiple random seeds and report mean accuracy and standard deviation. Statistical significance should be assessed where appropriate. }}
+
+\textbf{Author response:}
+The historical scores are single-run values and do not quantify variability. We have specified five independently seeded pipeline repetitions, pairing each split and initialization configuration across methods. The revised analysis will report mean and sample standard deviation and paired OA differences. With only five pairs, an exact two-sided sign-flip test cannot attain p below 0.0625; we will not interpret this limited power as evidence of equivalence.
+
+\textbf{Author action:}
+Specified seed pairs (345,0), (346,1), (347,2), (348,3), and (349,4) for split and training randomness in Section V.E. \pending{Execute all five repetitions and insert the summaries and multiplicity-corrected paired tests. The present historical tables remain single-run observations.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C5
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#5: Definition of the representative center token:The FEB module relies on a representative or center-pixel token. However, the experiments use $12\times12$ patches, which do not have a unique geometric center pixel. The authors should clarify how the representative token is selected and whether its location corresponds to the target pixel. }}
+
+\textbf{Author response:}
+The target label corresponds to patch coordinate (6,6) under the implemented offsets -6 through +5. Its row-major pixel-token index would be 78. FEB instead selects index 6 from the transposed/reshaped branch. Moreover, that branch groups entries across spatial coordinates and PCA components. Its selected token is therefore a fixed representative descriptor, not the target-pixel spectrum or a unique geometric center. We preserve this operation and correct its description.
+
+\textbf{Author action:}
+Revised Sections II.A and II.C and the architecture caption. Removed the center-pixel interpretation and provided the exact mapping. No change to the submitted forward operation is claimed.
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C6
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#6: Novelty and architectural justification: Although the integration of FastKAN, attention, and state-space modeling is potentially useful, the individual components are already established. The manuscript would benefit from additional controlled comparisons with conventional MLP projections, alternative nonlinear transformations, and standard Mamba-based sequence modeling. These experiments would help isolate the contributions of the proposed architectural choices. }}
+
+\textbf{Author response:}
+The component families are established, so the contribution is their investigated combination rather than invention of FastKAN, attention, or state-space modeling. Removal alone cannot isolate the benefit of an RBF mapping over a similarly sized alternative. We have therefore specified matched-interface linear and GELU-MLP projection controls, an MLP gating control, and pooling/selective-Mamba aggregation controls.
+
+\textbf{Author action:}
+Qualified the contribution statement and defined seven controlled variants in Section V.E. Parameter differences will be reported rather than assumed matched. \pending{The new ablation results and selective-Mamba reference verification are required before claiming an advantage of these choices.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C7
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#7: Generalization beyond the current evaluation protocol: The five benchmark datasets provide useful experimental coverage, but performance under spatially independent partitions and cross-scene evaluation would offer stronger evidence of generalization. At least one additional evaluation protocol designed to reduce spatial correlation between training and testing samples is recommended. }}
+
+\textbf{Author response:}
+Five benchmark scenes do not by themselves demonstrate cross-scene transfer when each model is trained and tested within the same scene. The additional spatial protocol addresses the requested reduction in training/test spatial correlation. It remains a within-scene spatial holdout, and neither it nor the original study establishes cross-sensor or cross-scene generalization.
+
+\textbf{Author action:}
+Added the preselected HC/HH spatial evaluation protocol and qualified the generalization claims in Section VI. \pending{Complete and report the spatial results. Cross-scene transfer remains an explicit limitation rather than a completed experiment.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C8
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#8: Reproducibility:The authors indicate that the source code will be released. A complete description of dataset partitions, random seeds, preprocessing, model configuration, training procedures, and computational environment should be provided. Releasing the exact experimental splits would substantially improve reproducibility. }}
+
+\textbf{Author response:}
+The revision package records center-index partitions, preprocessing fit state, split/training seeds, model configuration, source hashes, environment, commands, predictions, and run-level metrics. Seed changes are propagated to partition construction as well as training. We also distinguish the recovered local model definition from an authenticated historical experiment snapshot.
+
+\textbf{Author action:}
+Added the reproducibility protocol in Section V.E and an isolated experiment runner. The recovered HC model has 52,760 parameters versus the historical table's 37,540; the same 15,220-parameter difference occurs at all five class counts. \pending{Authenticate the original model configuration as well as the baseline implementations before full training, complete the experiment archive, and supply the verified public release URL and final environment record before submission. A public release is not claimed here.}
+
+\vspace{1.5em}
+% CONCERN-ID: R2-C9
+{\color{reviewgreen}\textbf{Reviewer \#2, Concern \#9: Interpretation of the ablation results: The reported ablation experiments are useful, particularly those involving FEB and FSSA. However, the authors should further explain why the contribution of FEB varies across datasets and provide a more detailed interpretation of cases in which removing a component does not reduce all evaluation metrics. }}
+
+\textbf{Author response:}
+The historical QUH result without FEB has OA 98.46 versus 98.37 and kappa 97.96 versus 97.85, while AA decreases from 96.93 to 96.56. This is a metric-dependent single-run observation, not evidence of a consistent FEB benefit or a proven dataset-specific mechanism. OA is frequency-weighted whereas AA weights classes equally, so they can move differently. The physical cause of this outcome is not established by the existing table.
+
+\textbf{Author action:}
+Revised Section V.B to state this exception and remove universal-benefit language. Added a five-repetition QUH without-FEB comparison with per-class analysis. \pending{Use the paired results to determine whether the apparent changes persist; do not assert a causal explanation from the current single-run values.}
+
+\vspace{1.5em}
+\end{document}

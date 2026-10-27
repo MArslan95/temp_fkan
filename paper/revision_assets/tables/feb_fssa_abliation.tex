@@ -1,0 +1,28 @@
+\begin{table*}[h]
+\caption{Historical single-run within-scene results. Analysis of the Contribution of Individual Modules in FKANMamba.}
+\centering
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|c|ccc|ccc|ccc|ccc|ccc|}
+\hline
+\multirow{2}{*}{\textbf{Model Variant}}
+& \multicolumn{3}{c|}{\textbf{HC}} & \multicolumn{3}{c|}{\textbf{HH}} & \multicolumn{3}{c|}{\textbf{PI}} & \multicolumn{3}{c|}{\textbf{TH}} & \multicolumn{3}{c|}{\textbf{QUH}} \\
+\cline{2-16} 
+& OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ \\
+\hline
+Without FEB
+& 97.53 & 92.97 & 97.11 & 96.23 & 91.91 & 95.24 & 98.47 & 95.15 & 97.71 & 98.80 & 94.33 & 98.64 & 98.46 & 96.56 & 97.96 \\
+\hline
+
+Without FSSA
+& 85.79 & 73.44 & 83.33 & 89.34 & 76.32 & 86.53 & 92.91 & 81.78 & 89.36 & 93.61 & 90.00 & 92.74 & 91.39 & 84.52 & 88.60 \\
+\hline
+
+\textbf{FKANMamba}
+& 98.63 & 97.43 & 98.40 & 98.63 & 95.50 & 98.27 & 98.84 & 96.93 & 98.27 & 99.31 & 98.50 & 99.21 & 98.37 & 96.93 & 97.85 \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\label{tab:feb_fssa}
+\end{table*}
+
+

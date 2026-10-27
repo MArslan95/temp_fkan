@@ -1,0 +1,65 @@
+\begin{figure}[!htbp]
+\caption{Historical single-run within-scene results.  Impact of attention heads on OA across five datasets}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=5pt,
+    width=9cm,
+    height=5.5cm,
+    ymin=95, ymax=100,
+    ylabel={OA($\%$)},
+    xlabel={Attention Heads},
+    symbolic x coords={2,4,6,8},
+    xtick=data,
+    enlarge x limits=0.15,
+    legend style={
+        at={(0.5,1.05)}, anchor=south,
+        legend columns=5, font=\footnotesize,
+        /tikz/every even column/.append style={column sep=0.3cm}
+    },
+    ylabel style={font=\small},
+    xlabel style={font=\small},
+    grid=major,
+    grid style={dashed, gray!30},
+]
+% Define custom colors
+\definecolor{hc}{RGB}{100,149,237}     % Cornflower Blue
+\definecolor{hh}{RGB}{255,99,132}      % Light Red
+\definecolor{pi}{RGB}{255,204,102}     % Light Orange
+\definecolor{th}{RGB}{153,204,102}     % Light Green
+\definecolor{quh}{RGB}{160,160,160}    % Gray
+% Plot per dataset
+\addplot+[style={hc, fill=hc!30}] coordinates {(2,95.944) (4,96.845) (6,95.557) (8,98.639)};
+\addplot+[style={hh, fill=hh!30}] coordinates {(2,96.065) (4,98.235) (6,97.011) (8,98.634)};
+\addplot+[style={pi, fill=pi!40}] coordinates {(2,97.556) (4,98.837) (6,97.920) (8,98.871)};
+\addplot+[style={th, fill=th!40}] coordinates {(2,98.429) (4,99.442) (6,98.565) (8,99.311)};
+\addplot+[style={quh, fill=quh!40}] coordinates {(2,97.119) (4,98.298) (6,97.915) (8,98.379)};
+
+\legend{HC, HH, PI, TH, QUH}
+\end{axis}
+\end{tikzpicture}
+
+\label{fig:diff_head}
+\end{figure}
+
+
+% \begin{table}[!htbp]
+% \centering
+% \caption{Impact of Attention HEADS on OA ACROSS FIVE HSI DATASETS}
+% % \vspace{-0.1in}
+% \resizebox{0.5\textwidth}{!}{%
+% \begin{tabular}{c|ccccccccc}
+% \hline
+% \textbf{Attention Heads} & \textbf{HC} & \textbf{HH} & \textbf{PI} & \textbf{TH} & \textbf{QUH} \\
+% \hline
+% 2     & 95.944 &96.065 & 97.556 & 98.429 & 97.119  \\
+% 4     & 96.845 & 98.235 & 98.837 & \textbf{99.442} & 98.298 \\
+% 6     & 95.557 & 97.011 & 97.920 & 98.565 & 97.915   \\
+% 8     & \textbf{98.639} & \textbf{98.634} & \textbf{98.871} & 99.311 & \textbf{98.379}  \\
+
+% \hline
+% \end{tabular}%
+% }
+% \smallskip
+% \end{table}

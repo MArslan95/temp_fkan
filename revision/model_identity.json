@@ -1,0 +1,21 @@
+{
+  "verified": false,
+  "reference_sha256": "ef9f2b4e45f48bda63d7ea3afb26b07fc53fb1610c121f0d5ec2efad540d02d0",
+  "observed_parameters": {
+    "HC": 52760,
+    "HH": 53150,
+    "TH": 52890,
+    "PI": 52370,
+    "QUH": 52110
+  },
+  "historical_parameters": {
+    "HC": 37540,
+    "HH": 37930,
+    "TH": 37670,
+    "PI": 37150,
+    "QUH": 36890
+  },
+  "common_difference": 15220,
+  "historical_identity_evidence": null,
+  "resolution": "Authenticate the original source/checkpoint/configuration before production training. Do not change widths or RBF grids by guessing to match a parameter total."
+}

@@ -1,0 +1,63 @@
+\begin{table*}[!ht]
+\caption{Performance comparison for different patch sizes using OA, AA, and $\kappa$ (\%).}
+% \caption{Impact of patch size on classification performance in terms of OA, AA, and $\kappa$ (\%).}
+\centering
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|ccc|ccc|ccc|ccc|ccc|}
+\hline
+\multirow{2}{*}{\textbf{Patch}}
+& \multicolumn{3}{c|}{\textbf{HC}} & \multicolumn{3}{c|}{\textbf{HH}} & \multicolumn{3}{c|}{\textbf{PI}} & \multicolumn{3}{c|}{\textbf{TH}} & \multicolumn{3}{c|}{\textbf{QUH}} \\ \cline{2-16}
+
+& OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ & OA & AA & $\kappa$ \\
+\hline
+
+\(2 \times 2\) & 86.79 & 73.21 & 84.52 & 85.64 & 70.05 & 81.85 & 95.46 & 88.28 & 93.23 & 94.29 & 90.66 & 93.49 & 93.44 & 85.02 & 91.30 \\ \hline
+
+\(4 \times 4\) & 92.92 & 86.01 & 91.72 & 93.18 & 84.11 & 91.37 & 96.69 & 88.67 & 95.05 & 96.33 & 92.78 & 95.83 & 95.12 & 89.35 & 93.53 \\ \hline
+
+\(6 \times 6\) & 95.58 & 92.80 & 94.82 & 96.41 & 93.36 & 95.47 & 97.87 & 93.98 & 96.83 & 98.05 & 96.95 & 97.79 & 96.40 & 92.95 & 95.23 \\ \hline
+
+\(8 \times 8\) & 96.94 & 94.35 & 96.42 & 97.42 & 94.25 & 96.74 & 98.27 & 96.61 & 97.42 & 98.56 & 97.39 & 98.36 & 97.15 & 95.40 & 96.22 \\ \hline
+
+\(10 \times 10\) & 98.20 & 96.03 & 97.89 & 98.32 & 96.69 & 97.88 & 98.71 & \textbf{97.10} & 98.08 & 99.14 & 98.38 & 99.02 & 98.28 & 96.66 & 97.73 \\ \hline
+
+\(12 \times 12\) & 98.63 & 97.43 & 98.40 & 98.63 & 95.50 & 98.27 & \textbf{98.84} & 96.93 & \textbf{98.27} & 99.31 & 98.50 & 99.21 & 98.37 & \textbf{96.93} &97.85 \\ \hline
+
+\(14 \times 14\) & \textbf{99.22} & \textbf{98.58} & \textbf{99.09} & \textbf{98.77} & \textbf{97.19} & \textbf{98.45} & 98.77 & 96.57 & 98.17 & \textbf{99.46} & \textbf{98.73} & \textbf{99.38} & \textbf{98.69} & 96.59 & \textbf{98.27} \\ \hline
+
+\end{tabular}
+\end{adjustbox}
+\label{tab:patch_acc}
+\end{table*}
+
+
+
+
+
+
+
+
+
+
+% \begin{table*}[!ht]
+% \centering
+% \begin{adjustbox}{max width=\linewidth}
+% \begin{tabular}{|l||ccc||ccc||ccc||ccc||ccc|}
+% \hline
+% \multirow{2}{*}{\textbf{Patch}}
+% & \multicolumn{3}{c||}{\textbf{HC}} & \multicolumn{3}{c||}{\textbf{HH}} & \multicolumn{3}{c||}{\textbf{PI}} & \multicolumn{3}{c||}{\textbf{TH}}  & \multicolumn{3}{c|}{\textbf{QUH}} \\ \cline{2-16}
+%             & $\kappa$ & OA & AA      & $\kappa$ & OA & AA    & $\kappa$ & OA & AA   & $\kappa$ & OA & AA &     $\kappa$ & OA & AA \\
+% \hline
+% \(2 \times 2\) & 84.52 & 86.79 & 73.21  & 81.85 & 85.64 & 70.05 & 93.23 & 95.46 & 88.28  & 93.49 & 94.29 & 90.66  & 91.3 & 93.44 & 85.02 \\ \hline
+% \(4 \times 4\) & 91.72 & 92.92 & 86.01  & 91.37 & 93.18 & 84.11 & 95.05 & 96.69 & 88.67  & 95.83 & 96.33 & 92.78  & 93.53 & 95.12 & 89.35 \\ \hline
+% \(6 \times 6\) & 94.82 & 95.58 & 92.8   & 95.47 & 96.41 & 93.36 & 96.83 & 97.87 & 93.98  & 97.79 & 98.05 & 96.95  & 95.23 & 96.40 & 92.95 \\ \hline
+% \(8 \times 8\) & 96.42 & 96.94 & 94.35  & 96.74 & 97.42 & 94.25 & 97.42 & 98.27 &96.61   & 98.36 & 98.56 & 97.39  & 96.22 & 97.15 & 95.40 \\ \hline
+% \(10 \times 10\) & 97.89 & 98.20 & 96.03 & 97.88 & 98.32 & 96.69 & 98.08 & 98.71 & 97.10  & 99.02 & 99.14 & 98.38	& 97.73 & 98.28 & 96.66 \\ \hline
+% \(12 \times 12\) & 98.40 & 98.63 & 97.43 & 98.27 & 98.63 & 95.50  & \textbf{98.27} &\textbf{98.84} &\textbf{96.93} & 99.21 & 99.31 & 98.50 & 97.85 &98.37 & 96.93 \\ \hline
+% \(14 \times 14\) &\textbf{99.09} & \textbf{99.22} & \textbf{98.58} & \textbf{98.45} & \textbf{98.77} & \textbf{97.19}  & 98.17 & 98.77 & 96.57 & \textbf{99.38} & \textbf{99.46} & \textbf{98.73} & \textbf{98.27} &\textbf{98.69} & \textbf{96.59} \\ \hline
+% \end{tabular}
+% \end{adjustbox}
+% \caption{\label{tab:patch_acc} Impact of patch sizes on classification performance.}
+% \end{table*}
+
+

@@ -1,0 +1,10 @@
+{
+  "HViT": {"factory": null, "verified": false, "reason": "Candidate models/vit.py:Hybrid_ViT; authenticate architecture/settings against the cited paper before registration."},
+  "SSF": {"factory": null, "verified": false, "reason": "Candidate models/vit.py:SSFormer; authenticate identity and forward dimensions."},
+  "SSFTTKAN": {"factory": null, "verified": false, "reason": "No authenticated importable implementation found in the inspected checkout."},
+  "HybridKAN": {"factory": null, "verified": false, "reason": "No authenticated importable implementation found in the inspected checkout."},
+  "DF": {"factory": null, "verified": false, "reason": "Candidate models/DiffFormer.py:DSST; authenticate variant and settings."},
+  "SSMM": {"factory": null, "verified": false, "reason": "Candidate models/MorpMamba.py:MorpMamba; name alone does not establish paper equivalence."},
+  "MHM": {"factory": null, "verified": false, "reason": "Candidate models/Mamba_model.py:MulMamba; file has an invalid tensorflow.keras.layers.re import and dense recurrence implementations."},
+  "WM": {"factory": null, "verified": false, "reason": "Candidate models/WaveMamba.py:WaveMamba; verify against the cited Wavelet Mamba, including its preprocessing."}
+}

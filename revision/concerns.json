@@ -1,0 +1,150 @@
+[
+  {
+    "id": "R1-C1",
+    "priority": 10,
+    "kind": "Protocol disclosure; shared experiment",
+    "score": 7,
+    "locations": [
+      "sec:experiments",
+      "sec:revision_protocol",
+      "sec:limitations"
+    ]
+  },
+  {
+    "id": "R1-C2",
+    "priority": 10,
+    "kind": "Architectural correction; controlled experiment",
+    "score": 8,
+    "locations": [
+      "sec:ssm",
+      "sec:revision_protocol"
+    ]
+  },
+  {
+    "id": "R1-C3",
+    "priority": 9,
+    "kind": "Implementation disclosure; unresolved historical provenance",
+    "score": 6,
+    "locations": [
+      "sec:token_details",
+      "sec:fastkan",
+      "sec:feb",
+      "sec:fssa",
+      "sec:ablation"
+    ]
+  },
+  {
+    "id": "R1-C4",
+    "priority": 9,
+    "kind": "Claim correction; shared profiling experiment",
+    "score": 8,
+    "locations": [
+      "sec:ssm",
+      "sec:revision_protocol",
+      "sec:conclusion"
+    ]
+  },
+  {
+    "id": "R1-C5",
+    "priority": 5,
+    "kind": "Numerical correction; figure readability",
+    "score": 7,
+    "locations": [
+      "tab:HH",
+      "fig:HC",
+      "fig:HH",
+      "fig:TH",
+      "fig:PI",
+      "fig:QUH"
+    ]
+  },
+  {
+    "id": "R2-C1",
+    "priority": 10,
+    "kind": "Major experimental validity; new protocol",
+    "score": 4,
+    "locations": [
+      "sec:experiments",
+      "sec:revision_protocol",
+      "sec:limitations"
+    ]
+  },
+  {
+    "id": "R2-C2",
+    "priority": 10,
+    "kind": "Architectural identity",
+    "score": 9,
+    "locations": [
+      "sec:ssm"
+    ]
+  },
+  {
+    "id": "R2-C3",
+    "priority": 9,
+    "kind": "Required controlled measurement",
+    "score": 3,
+    "locations": [
+      "sec:ssm",
+      "sec:revision_protocol"
+    ]
+  },
+  {
+    "id": "R2-C4",
+    "priority": 9,
+    "kind": "Required independent repetitions",
+    "score": 3,
+    "locations": [
+      "sec:revision_protocol"
+    ]
+  },
+  {
+    "id": "R2-C5",
+    "priority": 10,
+    "kind": "Factual implementation correction",
+    "score": 9,
+    "locations": [
+      "sec:token_details",
+      "sec:feb",
+      "fig:architecture"
+    ]
+  },
+  {
+    "id": "R2-C6",
+    "priority": 9,
+    "kind": "Novelty qualification; causal comparisons",
+    "score": 3,
+    "locations": [
+      "sec:revision_protocol",
+      "sec:conclusion"
+    ]
+  },
+  {
+    "id": "R2-C7",
+    "priority": 9,
+    "kind": "Generalization protocol; shared spatial study",
+    "score": 4,
+    "locations": [
+      "sec:revision_protocol",
+      "sec:limitations"
+    ]
+  },
+  {
+    "id": "R2-C8",
+    "priority": 9,
+    "kind": "Reproducibility and release evidence",
+    "score": 6,
+    "locations": [
+      "sec:revision_protocol"
+    ]
+  },
+  {
+    "id": "R2-C9",
+    "priority": 7,
+    "kind": "Interpretation; repeated controlled evidence",
+    "score": 7,
+    "locations": [
+      "sec:ablation",
+      "sec:revision_protocol"
+    ]
+  }
+]

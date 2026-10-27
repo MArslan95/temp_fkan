@@ -1,0 +1,113 @@
+Model: "DSST"
+__________________________________________________________________________________________________
+ Layer (type)                Output Shape                 Param #   Connected to                  
+==================================================================================================
+ inputs (InputLayer)         [(None, 12, 12, 15)]         0         []                            
+                                                                                                  
+ tf.expand_dims (TFOpLambda  (None, 1, 12, 12, 15)        0         ['inputs[0][0]']              
+ )                                                                                                
+                                                                                                  
+ patch_embed (Conv3D)        (None, 1, 1, 1, 64)          138304    ['tf.expand_dims[0][0]']      
+                                                                                                  
+ tf.compat.v1.shape (TFOpLa  (5,)                         0         ['patch_embed[0][0]']         
+ mbda)                                                                                            
+                                                                                                  
+ tf.__operators__.getitem (  (3,)                         0         ['tf.compat.v1.shape[0][0]']  
+ SlicingOpLambda)                                                                                 
+                                                                                                  
+ tf.math.reduce_prod (TFOpL  ()                           0         ['tf.__operators__.getitem[0][
+ ambda)                                                             0]']                          
+                                                                                                  
+ tf.reshape (TFOpLambda)     (None, 1, 64)                0         ['patch_embed[0][0]',         
+                                                                     'tf.math.reduce_prod[0][0]'] 
+                                                                                                  
+ tf.compat.v1.shape_1 (TFOp  (3,)                         0         ['tf.reshape[0][0]']          
+ Lambda)                                                                                          
+                                                                                                  
+ tf.__operators__.getitem_1  ()                           0         ['tf.compat.v1.shape_1[0][0]']
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.broadcast_to (TFOpLambd  (None, 1, 64)                0         ['tf.__operators__.getitem_1[0
+ a)                                                                 ][0]']                        
+                                                                                                  
+ tf.concat (TFOpLambda)      (None, 2, 64)                0         ['tf.broadcast_to[0][0]',     
+                                                                     'tf.reshape[0][0]']          
+                                                                                                  
+ tf.compat.v1.shape_2 (TFOp  (3,)                         0         ['tf.concat[0][0]']           
+ Lambda)                                                                                          
+                                                                                                  
+ tf.__operators__.getitem_2  ()                           0         ['tf.compat.v1.shape_2[0][0]']
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.range (TFOpLambda)       (2,)                         0         ['tf.__operators__.getitem_2[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.__operators__.getitem_3  (2, 1)                       0         ['tf.range[0][0]']            
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.cast (TFOpLambda)        (2, 1)                       0         ['tf.__operators__.getitem_3[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.math.multiply (TFOpLamb  (2, 64)                      0         ['tf.cast[0][0]']             
+ da)                                                                                              
+                                                                                                  
+ tf.__operators__.getitem_4  (2, 32)                      0         ['tf.math.multiply[0][0]']    
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.__operators__.getitem_5  (2, 32)                      0         ['tf.math.multiply[0][0]']    
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.math.sin (TFOpLambda)    (2, 32)                      0         ['tf.__operators__.getitem_4[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.math.cos (TFOpLambda)    (2, 32)                      0         ['tf.__operators__.getitem_5[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.concat_1 (TFOpLambda)    (2, 64)                      0         ['tf.math.sin[0][0]',         
+                                                                     'tf.math.cos[0][0]']         
+                                                                                                  
+ tf.__operators__.getitem_6  (1, 2, 64)                   0         ['tf.concat_1[0][0]']         
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.cast_1 (TFOpLambda)      (1, 2, 64)                   0         ['tf.__operators__.getitem_6[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.reshape_1 (TFOpLambda)   (1, 2, 64)                   0         ['tf.cast_1[0][0]']           
+                                                                                                  
+ tf.__operators__.add (TFOp  (None, 2, 64)                0         ['tf.concat[0][0]',           
+ Lambda)                                                             'tf.reshape_1[0][0]']        
+                                                                                                  
+ transformer_layer_0 (SST)   (None, 2, 64)                41792     ['tf.__operators__.add[0][0]']
+                                                                                                  
+ transformer_layer_1 (SST)   (None, 2, 64)                41792     ['transformer_layer_0[0][0]'] 
+                                                                                                  
+ tf.compat.v1.shape_3 (TFOp  (3,)                         0         ['transformer_layer_1[0][0]'] 
+ Lambda)                                                                                          
+                                                                                                  
+ tf.__operators__.getitem_7  ()                           0         ['tf.compat.v1.shape_3[0][0]']
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ tf.reshape_2 (TFOpLambda)   (None, 2, 64)                0         ['transformer_layer_1[0][0]', 
+                                                                     'tf.__operators__.getitem_7[0
+                                                                    ][0]']                        
+                                                                                                  
+ tf.__operators__.getitem_8  (None, 64)                   0         ['tf.reshape_2[0][0]']        
+  (SlicingOpLambda)                                                                               
+                                                                                                  
+ dense_12 (Dense)            (None, 32)                   2080      ['tf.__operators__.getitem_8[0
+                                                                    ][0]']                        
+                                                                                                  
+ output_layer (Dense)        (None, 16)                   528       ['dense_12[0][0]']            
+                                                                                                  
+==================================================================================================
+Total params: 224496 (876.94 KB)
+Trainable params: 224496 (876.94 KB)
+Non-trainable params: 0 (0.00 Byte)
+__________________________________________________________________________________________________
+
+Total Parameters: 224496
+
+Total Parameters: 224496
+Trainable Parameters: 224496
+Non-trainable Parameters: 0
+FLOPs (batch=1): 959456

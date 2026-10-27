@@ -1,0 +1,170 @@
+\begin{table*}[h]
+\caption{Comparison of attention mechanisms on HSI datasets.}
+\centering
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|ccc|ccc|ccc|ccc|ccc|}
+\hline
+\multirow{2}{*}{\textbf{Dataset}}
+& \multicolumn{3}{c|}{\textbf{NA}}
+& \multicolumn{3}{c|}{\textbf{MHSA}}
+& \multicolumn{3}{c|}{\textbf{CA}}
+& \multicolumn{3}{c|}{\textbf{DMHSA}}
+& \multicolumn{3}{c|}{\textbf{FSSA}} \\ \cline{2-16}
+
+& OA & AA & $\kappa$
+& OA & AA & $\kappa$
+& OA & AA & $\kappa$
+& OA & AA & $\kappa$
+& OA & AA & $\kappa$ \\
+\hline
+
+HC
+& 77.53 & 57.99 & 73.43
+& 95.25 & 91.74 & 94.44
+& 90.00 & 79.99 & 88.28
+& 92.35 & 87.00 & 91.06
+& \textbf{98.63} & \textbf{97.43} & \textbf{98.40} \\ \hline
+
+HH
+& 87.92 & 73.59 & 84.71
+& 96.39 & 84.11 & 95.43
+& 95.06 & 93.36 & 93.74
+& 94.15 & 87.29 & 92.61
+& \textbf{98.63} & \textbf{95.50} & \textbf{98.27} \\ \hline
+
+PI
+& 93.47 & 82.57 & 90.25
+& 97.65 & 93.92 & 96.50
+& 95.58 & 87.87 & 93.40
+& 97.62 & 93.85 & 96.46
+& \textbf{98.84} & \textbf{96.93} & \textbf{98.27} \\ \hline
+
+TH
+& 94.23 & 89.36 & 93.43
+& 97.70 & 93.67 & 97.38
+& 97.21 & 93.86 & 96.83
+& 97.62 & 96.15 & 97.30
+& \textbf{99.31} & \textbf{98.50} & \textbf{99.21} \\ \hline
+
+QUH
+& 91.46 & 83.99 & 88.67
+& 95.86 & 91.15 & 94.51
+& 94.78 & 89.30 & 93.08
+& 96.53 & 95.04 & 95.41
+& \textbf{98.37} & \textbf{96.93} & \textbf{97.85} \\ \hline
+
+\end{tabular}
+\end{adjustbox}
+
+\label{tab:attention_comparison}
+\end{table*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+% \begin{figure}[!ht]
+%     \centering
+%     \begin{adjustbox}{max width=\textwidth}
+%     \begin{tikzpicture}
+%         \begin{axis}[
+%             width=10cm,
+%             height=8cm,
+%             ylabel= {\textbf{OA (\%) }},
+%             xtick={1,2,3,4,5},
+%             xticklabels={NA, MHSA, CA, DMHSA, FSSA},
+%             legend style={at={(0.98,0.02)}, anchor=south east, font=\scriptsize,
+%             rounded corners=2pt,
+%             opacity=0.9}, grid=major,
+%             grid style={dashed, gray!30},
+%             ]
+%             \addplot[color=blue!60, mark=*, thick ] coordinates {(1, 77.53) (2, 95.25) (3, 90.00) (4, 92.35) (5, 98.63)};
+%             \addlegendentry{HC}
+%             \addplot[color=red!60, mark=*, thick] coordinates {(1, 87.92) (2, 96.39) (3, 95.06) (4, 94.15) (5, 98.63)};
+%             \addlegendentry{HH}
+%             \addplot[color=magenta!60, mark=*, thick] coordinates {(1, 93.47) (2, 97.65) (3, 95.58) (4, 97.62) (5, 98.84)};
+%             \addlegendentry{PI}
+%             \addplot[color=cyan!70, mark=*, thick] coordinates {(1, 94.23) (2, 97.70) (3, 97.21) (4, 97.62) (5, 99.31)};
+%             \addlegendentry{TH}
+%             \addplot[color=brown!70, mark=*] coordinates {(1, 91.46) (2, 95.86) (3, 94.78) (4, 96.53) (5, 98.37)};
+%             \addlegendentry{QUH}
+%         \end{axis}
+%     \end{tikzpicture}
+%     \hfill
+%     \begin{tikzpicture}
+%         \begin{axis}[
+%             width=10cm,
+%             height=8cm,
+%             ylabel={\textbf{Kappa ($\kappa$) }},
+%             xtick={1,2,3,4,5},
+%             xticklabels={NA, MHSA, CA, DMHSA, FSSA},
+%              legend style={at={(0.98,0.02)}, anchor=south east,font=\scriptsize,
+%             rounded corners=2pt,
+%             opacity=0.9},
+%             grid=major,
+%             grid style={dashed, gray!30},
+%             ]
+%             \addplot[color=blue!60, mark=*, thick] coordinates {(1, 73.43) (2, 94.44) (3, 88.28) (4, 91.06) (5, 98.40)};
+%             \addlegendentry{HC}
+%             \addplot[color=red!60, mark=*, thick] coordinates {(1, 84.71) (2, 95.43) (3, 93.74) (4, 92.61) (5, 98.27)};
+%             \addlegendentry{HH}
+%             \addplot[color=magenta!60, mark=*, thick] coordinates {(1, 90.25) (2, 96.50) (3, 93.40) (4, 96.46) (5, 98.27)};
+%             \addlegendentry{PI}
+%             \addplot[color=cyan!70, mark=*, thick] coordinates {(1, 93.43) (2, 97.38) (3, 96.83) (4, 97.30) (5, 99.21)};
+%             \addlegendentry{TH}
+%             \addplot[color=brown!70, mark=*, thick] coordinates {(1, 88.67) (2, 94.51) (3, 93.08) (4, 95.41) (5, 97.85)};
+%             \addlegendentry{QUH}
+%         \end{axis}
+%     \end{tikzpicture}
+%     \hfill
+%     \begin{tikzpicture}
+%         \begin{axis}[
+%             width=10cm,
+%             height=8cm,
+%             ylabel={\textbf{AA (\%)}},
+%             xtick={1,2,3,4,5},
+%             xticklabels={NA, MHSA, CA, DMHSA, FSSA},
+%              legend style={at={(0.98,0.02)}, anchor=south east,font=\scriptsize,
+%             rounded corners=2pt,
+%             opacity=0.9},
+%             grid=major,
+%             grid style={dashed, gray!30},
+%             ]
+%             \addplot[color=blue!60, mark=*, thick] coordinates {(1, 57.99) (2, 91.74) (3, 79.99) (4, 87.00) (5, 97.43)};
+%             \addlegendentry{HC}
+%             \addplot[color=red!60, mark=*, thick] coordinates {(1, 73.59) (2, 84.11) (3, 93.36) (4, 87.29) (5, 95.50)};
+%             \addlegendentry{HH}
+%             \addplot[color=magenta!60, mark=*, thick] coordinates {(1, 82.57) (2, 93.92) (3, 87.87) (4, 93.85) (5, 96.93)};
+%             \addlegendentry{PI}
+%             \addplot[color=cyan!70, mark=*, thick] coordinates {(1, 89.36) (2, 93.67) (3, 93.86) (4, 96.15) (5, 98.50)};
+%             \addlegendentry{TH}
+%             \addplot[color=brown!70, mark=*, thick] coordinates {(1, 83.99) (2, 91.15) (3, 89.30) (4, 95.04) (5, 96.93)};
+%             \addlegendentry{QUH}
+%         \end{axis}
+%     \end{tikzpicture}
+%     \end{adjustbox}
+%     \caption{ Comparison of Overall Accuracy (OA), Kappa (\(\kappa\)), and Average Accuracy (AA) for different attention mechanisms on five hyperspectral datasets. NA = no attention; MHSA = multi-head self-attention; CA = cross-attention; DMHSA = differential MHSA; FSSA = FastKAN Spectral–Spatial Attention. FSSA delivers the highest performance across all metrics.}
+%     \label{fig:diff_attn}
+% \end{figure}
+
+
+	
+		
+
+
+
+
+
+		
+
+
+
