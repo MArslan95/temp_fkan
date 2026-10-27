@@ -1,7 +1,6 @@
 datasets/
 *.log
 *.ckpt  
-All res/
 /paper/*
 !/paper/repose_filled.tex
 !/paper/highlighted_filled.tex
@@ -29,5 +28,4 @@ revision/qa/
 revision/*.log
 !/revision/reference/models/
 !/revision/reference/models/*.py
-
 hsi_datasets/*
