@@ -29,4 +29,5 @@ revision/qa/
 revision/*.log
 !/revision/reference/models/
 !/revision/reference/models/*.py
+
 hsi_datasets/*
