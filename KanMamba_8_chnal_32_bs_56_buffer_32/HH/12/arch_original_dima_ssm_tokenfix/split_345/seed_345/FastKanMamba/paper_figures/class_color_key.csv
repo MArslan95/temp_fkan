@@ -1,0 +1,23 @@
+class_id,class_name,color_hex
+1,"Red roof",#670075
+2,"Road",#850096
+3,"Bare soil",#2d00a4
+4,"Cotton",#0000c9
+5,"Cotton firewood",#0041dd
+6,"Rape",#0085dd
+7,"Chinese cabbage",#009fcb
+8,"Pakchoi",#00aaa0
+9,"Cabbage",#00a773
+10,"Tuber mustard",#009c00
+11,"Brassica parachinensis",#00bc00
+12,"Brassica chinensis",#00da00
+13,"Small Brassica chinensis",#00fa00
+14,"Lactuca sativa",#84ff00
+15,"Celtuce",#dcf400
+16,"Film covered lettuce",#f8da00
+17,"Romaine lettuce",#ffb500
+18,"Carrot",#ff5d00
+19,"White radish",#f40000
+20,"Garlic sprout",#da0000
+21,"Broad bean",#cc1c1c
+22,"Tree",#cccccc

@@ -1,0 +1,16 @@
+class_id,class_name,color_hex
+1,"Healthy grass",#7d008e
+2,"Stressed grass",#2d00a4
+3,"Synthetic grass",#0000dd
+4,"Trees",#0082dd
+5,"Soil",#00a4bb
+6,"Water",#00aa88
+7,"Residential",#00a400
+8,"Commercial",#00d200
+9,"Road",#00ff00
+10,"Highway",#ccf900
+11,"Railway",#f9d700
+12,"Parking Lot 1",#ff9900
+13,"Parking Lot 2",#f40000
+14,"Tennis Court",#d20000
+15,"Running Track",#cccccc

@@ -293,6 +293,176 @@ def disjoint_spatial_split(
     return (*coords, split_map, owner_map)
 
 
+def _grow_one_connected_region(eligible, requested, rng):
+    """Select one 8-connected region (no random-pixel fallback).
+
+    Selects a random sufficiently large connected component when possible.
+    If none is large enough, propose the largest component; the calling
+    splitter REJECTS the candidate unless the FULL quota is attained.
+    Never silently scatter noncontiguous training pixels.
+    """
+    from collections import deque
+    from scipy import ndimage
+    eligible = np.asarray(eligible, dtype=bool)
+    labeled, number = ndimage.label(eligible, structure=np.ones((3, 3), dtype=np.uint8))
+    if not number:
+        return np.empty((0, 2), dtype=np.int32)
+    sizes = np.bincount(labeled.ravel(), minlength=number + 1)
+    sizes[0] = 0
+    full = np.flatnonzero(sizes >= requested)
+    choices = full if len(full) else np.flatnonzero(sizes == sizes.max())
+    component = int(rng.choice(choices))
+    rr, cc = np.nonzero(labeled == component)
+    seed_ix = int(rng.integers(len(rr)))
+    seed = (int(rr[seed_ix]), int(cc[seed_ix]))
+    queue = deque([seed])
+    visited = np.zeros(eligible.shape, dtype=bool)
+    visited[seed] = True
+    selected = []
+    neighbors = ((-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1))
+    height, width = eligible.shape
+    count = min(int(requested), int(sizes[component]))
+    while queue and len(selected) < count:
+        r, c = queue.popleft()
+        selected.append((r,c))
+        for k in rng.permutation(8):
+            dr, dc = neighbors[int(k)]
+            nr, nc = r + dr, c + dc
+            if (0 <= nr < height and 0 <= nc < width and not visited[nr,nc]
+                    and labeled[nr,nc] == component):
+                visited[nr,nc] = True
+                queue.append((nr,nc))
+    return np.asarray(selected, dtype=np.int32).reshape(-1, 2)
+
+
+def github_connected_disjoint_split(gt, window_size, buffer=0, seed=42,
+                                   search_trials=128, train_pixels=None,
+                                   validation_pixels=None, min_test_per_class=1):
+    """Class-wise connected train/validation; strict patch-safe held-out remainder.
+
+    Github quota convention: minimum GT class count // 10 training centers per
+    class; validation centers = training quota // 5. Overrides can be set before
+    experiments. Search uses GT/spatial geometry ONLY, never model/test scores.
+
+    All labeled pixels enter the allocation/eligibility audit. Some cannot be
+    used as centers because their full WS x WS input patches would overlap a
+    different subset; excluded centers are counted explicitly. If any GT class
+    is absent in train/validation/test, no split is accepted.
+    """
+    gt = np.asarray(gt)
+    if gt.ndim != 2 or not np.issubdtype(gt.dtype, np.integer) or np.any(gt < 0):
+        raise ValueError('GT must be a 2D image of nonnegative integer labels')
+    if window_size < 1 or buffer < 0 or search_trials < 1 or min_test_per_class < 1:
+        raise ValueError('window_size/search_trials/min_test_per_class >= 1; buffer >= 0')
+    classes, class_counts = np.unique(gt[gt > 0], return_counts=True)
+    if len(classes) < 2:
+        raise ValueError('Need >= 2 labeled classes for HSI classification')
+    smallest = int(class_counts.min())
+    ntrain = int(train_pixels) if train_pixels is not None else smallest // 10
+    nval = int(validation_pixels) if validation_pixels is not None else ntrain // 5
+    if ntrain < 1 or nval < 1:
+        raise ValueError('The GitHub minimum-class quota is zero; supply '
+                         '--connected_train_pixels and --connected_validation_pixels')
+    if np.any(class_counts <= ntrain + nval + min_test_per_class - 1):
+        raise ValueError('Per-class quotas leave no possible held-out sample. '
+                         f'GT class counts={dict(zip(classes.tolist(), class_counts.tolist()))}; '
+                         f'train quota={ntrain}, val quota={nval}, '
+                         f'min test={min_test_per_class}')
+    height, width = gt.shape
+    before, after = _window_bounds(window_size)
+    valid_edge = np.zeros(gt.shape, dtype=bool)
+    valid_edge[before:height-after, before:width-after] = True
+    if not valid_edge.any():
+        raise ValueError('Window is too large for scene')
+    rng = np.random.default_rng(seed)
+    best = None
+    best_retained = -1
+    near_misses = []
+    for trial in range(search_trials):
+        # Select exactly one connected train region for EACH class.
+        train_parts = []
+        for cls in classes:
+            part = _grow_one_connected_region((gt == cls) & valid_edge, ntrain, rng)
+            train_parts.append(part)
+        # An 8-connected region is required to contain the FULL predeclared
+        # per-class quota. Never silently train with fewer samples per class.
+        if any(len(p) != ntrain for p in train_parts):
+            continue
+        train = np.concatenate(train_parts)
+        train_coverage = footprint_coverage(train, gt.shape, window_size)
+
+        # Validation centers must be far enough from TRAIN'S ENTIRE input
+        # footprint that their OWN complete patches cannot share any pixels.
+        val_owner = np.ones(gt.shape, dtype=np.uint8)
+        val_owner[train_coverage] = 0
+        val_eligible = _contained_footprints(val_owner, 1, window_size, buffer)
+        val_parts = []
+        for cls in classes:
+            part = _grow_one_connected_region((gt == cls) & val_eligible, nval, rng)
+            val_parts.append(part)
+        if any(len(p) != nval for p in val_parts):
+            continue
+        validation = np.concatenate(val_parts)
+        validation_coverage = footprint_coverage(validation, gt.shape, window_size)
+        if np.any(train_coverage & validation_coverage):
+            raise AssertionError('Validation input pixels overlap training inputs')
+
+        # Input-pixel owner map: 0=train source pixels, 1=validation, 2=test.
+        # Unlike a block partition, ownership is determined by real footprints.
+        owner = np.full(gt.shape, 2, dtype=np.uint8)
+        owner[train_coverage] = 0
+        owner[validation_coverage] = 1
+        test_mask = _contained_footprints(owner, 2, window_size, buffer)
+        test_mask &= gt > 0
+        test = np.argwhere(test_mask).astype(np.int32)
+        train_support = np.array([np.count_nonzero(gt[train[:,0],train[:,1]] == cls)
+                                  for cls in classes])
+        val_support = np.array([np.count_nonzero(gt[validation[:,0],validation[:,1]] == cls)
+                                for cls in classes])
+        test_support = np.array([np.count_nonzero(gt[test[:,0],test[:,1]] == cls)
+                                 for cls in classes]) if len(test) else np.zeros(len(classes), dtype=int)
+        missing = classes[(train_support == 0) | (val_support == 0) |
+                          (test_support < min_test_per_class)]
+        if len(missing):
+            near_misses.append((len(missing), missing.tolist(), test_support.tolist()))
+            continue
+        # Exact connected quotas are hard constraints, not merely targets.
+        # Use class support as hard constraints, and retained labeled centers as
+        # geometry-only search objective; NEVER score a candidate by model OA.
+        retained = len(train) + len(validation) + len(test)
+        if retained > best_retained:
+            best_retained = retained
+            best = (train, validation, test, owner, trial, train_support,
+                    val_support, test_support)
+    if best is None:
+        near_misses.sort(key=lambda item: item[0])
+        closest = near_misses[:2]
+        raise ValueError(
+            f'No patch-safe connected-region split covering every class in all three '
+            f'subsets after {search_trials} geometric trials (WS={window_size}, '
+            f'buffer={buffer}, train/class={ntrain}, val/class={nval}). '
+            f'Closest missing test/val classes and support: {closest}. '
+            'Try predefined smaller training/validation quotas, or another '
+            'spatial protocol; never permit overlapping patches or silently '
+            'drop missing test classes.'
+        )
+    train, validation, test, owner, chosen_trial, train_support, val_support, test_support = best
+    center_map = np.zeros(gt.shape, dtype=np.uint8)
+    for subset, coords in enumerate((train, validation, test), 1):
+        center_map[coords[:,0], coords[:,1]] = subset
+    retained = len(train) + len(validation) + len(test)
+    original = int(np.count_nonzero(gt))
+    assert retained + int(np.count_nonzero((gt>0)&(center_map==0))) == original
+    if not np.all(train_support == ntrain) or not np.all(val_support == nval):
+        raise AssertionError('Exact predeclared connected class quotas not attained')
+    verify_disjoint_footprints((train, validation, test), gt.shape, window_size, owner)
+    print(f'CONNECTED CLASS REGIONS + PATCH-SAFE TEST PASS: '
+          f'all {len(classes)} classes in train/validation/test; '
+          f'chosen geometric trial={chosen_trial}; '
+          f'per-class quotas train={ntrain} val={nval}; '
+          f'retained={retained:,} excluded={original-retained:,}', flush=True)
+    return train, validation, test, center_map, owner
+
 def footprint_coverage(coords, image_shape, window_size):
     """Fast 2-D difference-array union of all input patch source pixels."""
     before, after = _window_bounds(window_size)
@@ -728,12 +898,20 @@ parser.add_argument(
 parser.add_argument(
     "--batch_size", "-bs", type=int, default=56, help="Batch size for training"
 )
-parser.add_argument("--block_size", type=int, default=32,
+parser.add_argument("--block_size", type=int, default=16,
                     help="Side length of assigned non-overlapping spatial blocks")
 parser.add_argument("--spatial_buffer", type=int, default=0,
                     help="Extra source pixels to exclude around each partition boundary")
 parser.add_argument("--search_trials", type=int, default=512,
-                    help="Random/guided block allocation trials")
+                    help="Candidate trials (block or connected-region protocol)")
+parser.add_argument("--split_protocol", choices=("blocks", "connected"), default="blocks",
+                    help="blocks=original spatial blocks; connected=GitHub-style connected regions with strict patch exclusion")
+parser.add_argument("--connected_train_pixels", type=int, default=None,
+                    help="Connected protocol: exact training centers PER CLASS; default=min(GT class count)//10")
+parser.add_argument("--connected_validation_pixels", type=int, default=None,
+                    help="Connected protocol: exact validation centers PER CLASS; default=train quota//5")
+parser.add_argument("--min_test_per_class", type=int, default=1,
+                    help="Connected protocol: fail unless every class has at least this many retained test centers")
 parser.add_argument("--seed", type=int, default=345,
                     help="Run seed: random, NumPy, TensorFlow initialization and training; also split unless overridden")
 parser.add_argument("--split_seed", type=int, default=None,
@@ -888,9 +1066,12 @@ out_channels=32
 epochs = args.epochs
 batch_size = args.batch_size
 # output_dir = os.path.join(f"Spaital_Spectral_Kan_Mamba/{HSID}/window_size/{WS}")
+# Distinct protocol directory so published block-split results stay intact.
+split_directory = (f"split_{args.split_seed}_github_connected_patchsafe"
+                   if args.split_protocol == "connected" else f"split_{args.split_seed}")
 output_dir = os.path.join(
     f"KanMamba_{num_heads}_chnal_{out_channels}_bs_{batch_size}",
-    HSID, str(WS), "arch_original_dima_ssm_tokenfix", f"split_{args.split_seed}",
+    HSID, str(WS), "arch_original", split_directory,
     f"seed_{args.seed}")
 if not os.path.exists(output_dir):
       os.makedirs(output_dir)
@@ -898,25 +1079,87 @@ if not os.path.exists(output_dir):
 # %%
 # Spatially disjoint patch extraction replaces the old ImageCubes function.
 HSI, GT, Num_Classes, target_names = LoadHSIData(HSID)  # Load the HSI data
-# STEP 1: Spatially assign blocks on the ORIGINAL image, before PCA or patches.
-# Block erosion removes all patch centers whose input footprints cross splits.
-Tr_xy, Va_xy, Te_xy, split_map, owner_map = disjoint_spatial_split(
-    GT, window_size=WS,
-    train_ratio=trRatio, validation_ratio=vrRatio, test_ratio=teRatio,
-    block_size=args.block_size, buffer=args.spatial_buffer, seed=args.split_seed,
-    search_trials=args.search_trials,
-)
+# STEP 1: choose the requested spatial partition on ORIGINAL GT, before PCA.
+# Connected mode follows GitHub's class-wise contiguous sampling quotas, but
+# unlike the source project enforces ZERO train/val/test INPUT-PATCH overlap.
+import hashlib
+if args.split_protocol == "connected":
+    if HSID not in ("HC", "HH"):
+        raise ValueError("This paper protocol is configured for HC and HH only")
+    Tr_xy, Va_xy, Te_xy, split_map, owner_map = github_connected_disjoint_split(
+        GT, window_size=WS, buffer=args.spatial_buffer, seed=args.split_seed,
+        search_trials=args.search_trials, train_pixels=args.connected_train_pixels,
+        validation_pixels=args.connected_validation_pixels,
+        min_test_per_class=args.min_test_per_class)
+    gt_labels, gt_counts = np.unique(GT[GT > 0], return_counts=True)
+    train_quota = (int(gt_counts.min()) // 10 if args.connected_train_pixels is None
+                   else int(args.connected_train_pixels))
+    val_quota = (train_quota // 5 if args.connected_validation_pixels is None
+                 else int(args.connected_validation_pixels))
+    print(f"Protocol=connected patch-safe; dataset={HSID}; "
+          f"quotas/class: train={train_quota} val={val_quota}; "
+          f"minimum test/class={args.min_test_per_class}")
+    print("INFO: GitHub connected-region quotas replace the old 5/5/90 block ratio targets.")
+else:
+    Tr_xy, Va_xy, Te_xy, split_map, owner_map = disjoint_spatial_split(
+        GT, window_size=WS,
+        train_ratio=trRatio, validation_ratio=vrRatio, test_ratio=teRatio,
+        block_size=args.block_size, buffer=args.spatial_buffer, seed=args.split_seed,
+        search_trials=args.search_trials)
+    train_quota = val_quota = -1
 
-# Save the exact split so it can be reproduced and independently audited.
-np.savez_compressed(
-    os.path.join(output_dir, "disjoint_spatial_split.npz"),
+# Persist the selected partition, seed and enough metadata for a reproducible
+# independent audit. Prevent overwriting saved evidence with different geometry.
+split_path = os.path.join(output_dir, "disjoint_spatial_split.npz")
+split_protocol_id = ("github_connected_regions_patchsafe_v1"
+                     if args.split_protocol == "connected" else "spatial_blocks_patchsafe_v1")
+gt_digest = hashlib.sha256(np.ascontiguousarray(GT).tobytes()).hexdigest()
+class_ids = np.unique(GT[GT > 0])
+per_class_original = np.array([np.count_nonzero(GT == cls) for cls in class_ids], dtype=np.int64)
+per_class_support = np.stack([
+    np.array([np.count_nonzero(GT[coords[:, 0], coords[:, 1]] == cls)
+              for cls in class_ids], dtype=np.int64)
+    for coords in (Tr_xy, Va_xy, Te_xy)])
+per_class_excluded = per_class_original - per_class_support.sum(axis=0)
+if (per_class_excluded < 0).any():
+    raise AssertionError("A labeled center was used in multiple subsets")
+if args.split_protocol == "connected" and (per_class_support < 1).any():
+    raise AssertionError("Connected protocol has zero support for a GT class")
+split_data = dict(
     train_coords=Tr_xy, validation_coords=Va_xy, test_coords=Te_xy,
     split_map=split_map, owner_map=owner_map,
-    window_size=WS, block_size=args.block_size,
-    spatial_buffer=args.spatial_buffer, seed=args.split_seed, model_seed=args.seed,
+    window_size=np.array(WS),
+    block_size=np.array(-1 if args.split_protocol == "connected" else args.block_size),
+    spatial_buffer=np.array(args.spatial_buffer), seed=np.array(args.split_seed),
+    model_seed=np.array(args.seed), search_trials=np.array(args.search_trials),
+    split_protocol=np.array(split_protocol_id), gt_sha256=np.array(gt_digest),
+    connected_train_pixels_per_class=np.array(train_quota),
+    connected_validation_pixels_per_class=np.array(val_quota),
+    min_test_per_class=np.array(args.min_test_per_class),
+    class_ids=class_ids, class_original=per_class_original,
+    class_train=per_class_support[0], class_validation=per_class_support[1],
+    class_test=per_class_support[2], class_excluded=per_class_excluded,
     requested_ratios=np.array([trRatio, vrRatio, teRatio]),
-    effective_ratios=effective_ratios,
-)
+    effective_ratios=effective_ratios)
+if os.path.exists(split_path):
+    with np.load(split_path, allow_pickle=False) as saved:
+        for name, value in split_data.items():
+            # model_seed can vary independently when the split seed is fixed.
+            if name == "model_seed":
+                continue
+            if name not in saved or not np.array_equal(saved[name], value):
+                raise FileExistsError(f"Saved split differs in {name}: {split_path}. "
+                                      "Refusing to overwrite an existing experiment.")
+    print("Reused identical saved split:", split_path)
+else:
+    np.savez_compressed(split_path, **split_data)
+    print("Saved exact spatial split:", split_path)
+print("Per-class GT / train / validation / test / excluded:")
+for i, cls in enumerate(class_ids):
+    print(f"  {int(cls):2d} {target_names[int(cls)-1]}: "
+          f"{per_class_original[i]} / {per_class_support[0,i]} / "
+          f"{per_class_support[1,i]} / {per_class_support[2,i]} / "
+          f"{per_class_excluded[i]}")
 
 n_selected = len(Tr_xy) + len(Va_xy) + len(Te_xy)
 n_labeled = int(np.count_nonzero(GT))
@@ -927,7 +1170,7 @@ print(f"Excluded by spatial disjointness: {n_labeled - n_selected:,} labeled cen
 if n_selected:
     kept = np.array([len(Tr_xy), len(Va_xy), len(Te_xy)]) / n_selected
     print("Achieved fractions AFTER erosion:", np.round(kept, 4).tolist())
-    if np.any(np.abs(kept - effective_ratios) > 0.025):
+    if args.split_protocol == "blocks" and np.any(np.abs(kept - effective_ratios) > 0.025):
         print("WARNING: retained ratios differ by >2.5 percentage points from targets; "
               "spatially disjoint blocks cannot promise exact split percentages.")
 for group_name, coords in (("train", Tr_xy), ("validation", Va_xy), ("test", Te_xy)):
@@ -1499,31 +1742,7 @@ def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, HSID, 
     file_name = os.path.join(output_dir,f"{HSID}_{teRatio}_{vrRatio}_{k}_{WS}_{DLM}_{batch_size}_Classification_Report.csv")
     CSV_file = CSVResults(file_name, classification, Confusion, Tr_Time, Te_Time, DL_Time, Kappa, OA, AA, Per_Class)
     print(classification)
-    # files.download(file_name)
-     # T-SNE Plot
-    # # Extract embeddings from the model (학습 데이터 임베딩 추출)
-    # embeddings = model.get_embeddings(Tr)
-    # # Convert embeddings to numpy array if it's not already (임베딩을 넘파이로 변환)
-    # embeddings_np = embeddings.numpy()
-    # # Apply t-SNE
-    # tsne = TSNE(n_components=2, perplexity=30, max_iter=1000, random_state=42)
-    # embeddings_2d = tsne.fit_transform(embeddings_np)   # t-SNE 학습 및 변환
-    # sns.set(style="whitegrid")
-    # # Plot tSNE
-    # plt.figure(figsize=(8, 5))
-    # Optional embedding plot omitted; paper uses nipy_spectral exclusively
-    # plt.title(f'tSNE: {HSID}', fontsize=12, fontweight='bold')
-    # plt.xlabel('tSNE-1', fontsize=12, fontweight='bold')
-    # plt.ylabel('tSNE-2', fontsize=12, fontweight='bold')
-    # # Increase tick label size
-    # plt.tick_params(labelsize=12)
-    # # Add grid lines and set background color
-    # plt.grid(True)
-    # # Save the figure with a high DPI for better quality
-    # plt.tight_layout()
-    # file_name = f"{HSID}_{trRatio}_{k}_{WS}_tsne.png"
-    # plt.savefig(os.path.join(output_dir, file_name), dpi=500, format='png', bbox_inches='tight', pad_inches=0)
-    
+  
     # Paper figures are strictly based on held-out test predictions (not train/val).
     fig_dir = os.path.join(output_dir, "paper_figures")
     os.makedirs(fig_dir, exist_ok=True)
@@ -1677,10 +1896,15 @@ tf.keras.backend.clear_session()
 
 
 
-# # Libraries
+
+
+
+
+
 # import time
 # import json
 # import os 
+# os.environ.setdefault("MPLBACKEND", "Agg")  # headless, publication figures
 # import argparse
 # import random
 # import sys
@@ -1688,7 +1912,8 @@ tf.keras.backend.clear_session()
 # import numpy as np
 # # Matplotlib (visualization)
 # import matplotlib.pyplot as plt
-# from matplotlib.colors import ListedColormap
+# from matplotlib.colors import ListedColormap, BoundaryNorm, to_hex
+# from matplotlib.patches import Patch
 # # Sklearrn,Scipy, seaborn
 # import scipy.io as sio  # MATLAB data file
 # # Spectrak to Load HSI Dataset
@@ -2150,6 +2375,230 @@ tf.keras.backend.clear_session()
 #       CSV_file.write('{}'.format(confusion))
 #     return CSV_file
 
+# # -----------------------------------------------------------------------------
+# # PAPER VISUALIZATIONS — SAME SIMPLE imshow STYLE AS ORIGINAL main.py.
+# # ONLY Matplotlib's nipy_spectral palette is used (all class, split, and plots).
+# # All plots generated in THIS main.py, no extra plotting utility module.
+# # -----------------------------------------------------------------------------
+# def save_paper_figure(fig, stem):
+#     """500-DPI PNG and PDF; plain image axes like the original HSI script."""
+#     fig.savefig(stem + '.png', dpi=500, format='png',
+#                 bbox_inches='tight', pad_inches=0.03)
+#     fig.savefig(stem + '.pdf', format='pdf',
+#                 bbox_inches='tight', pad_inches=0.03)
+#     plt.close(fig)
+
+
+# def _hsi_class_palette(num_classes):
+#     """Class 1..N sample a FIXED nipy_spectral scale; 0 is masked background."""
+#     cmap = plt.get_cmap('nipy_spectral')
+#     return [cmap(i / num_classes) for i in range(1, num_classes + 1)]
+
+
+# def _hsi_discrete_colormap(num_classes):
+#     cmap = plt.get_cmap('nipy_spectral')
+#     colors = [cmap(i / num_classes) for i in range(num_classes + 1)]
+#     return (ListedColormap(colors),
+#             BoundaryNorm(np.arange(-0.5, num_classes + 1.5), len(colors)),
+#             colors[1:])
+
+
+# def _paper_map_legend(fig, palette, names, include_background=True, x=0.79):
+#     handles = []
+#     if include_background:
+#         handles.append(Patch(facecolor=plt.get_cmap('nipy_spectral')(0),
+#                              label='0  Unlabeled / not evaluated'))
+#     handles += [Patch(facecolor=palette[i], label=f'{i+1:02d}  {name}')
+#                 for i, name in enumerate(names)]
+#     fig.legend(handles=handles, loc='center left', bbox_to_anchor=(x, 0.50),
+#                frameon=False, fontsize=8, ncol=1)
+
+
+# def plot_spatial_partition(gt, split_map, dataset, window_size, split_seed, out_dir):
+#     """0 unlabeled, 1 excluded, 2 training, 3 validation, 4 testing."""
+#     gt, split_map = np.asarray(gt), np.asarray(split_map)
+#     if gt.shape != split_map.shape or not np.isin(split_map, [0, 1, 2, 3]).all():
+#         raise ValueError('Malformed spatial split map')
+#     view = np.zeros(gt.shape, dtype=np.uint8)
+#     view[gt > 0] = 1
+#     for i in (1, 2, 3):
+#         view[split_map == i] = i + 1
+#     counts = [int((view == i).sum()) for i in range(5)]
+#     names = ['Unlabeled', 'Excluded labeled', 'Train', 'Validation', 'Held-out test']
+#     # Every map color is an exact sample of nipy_spectral.
+#     cmap = ListedColormap([plt.get_cmap('nipy_spectral')(i / 4) for i in range(5)])
+#     fig, ax = plt.subplots(figsize=(9.5, 6.4))
+#     ax.imshow(view, cmap=cmap, vmin=0, vmax=4, interpolation='nearest')
+#     ax.axis('off')
+#     fig.subplots_adjust(right=0.73)
+#     fig.legend(handles=[Patch(facecolor=cmap(i / 4), label=f'{names[i]} ({counts[i]:,})')
+#                 for i in range(5)], loc='center left', bbox_to_anchor=(0.73, 0.5),
+#                frameon=False, fontsize=9)
+#     save_paper_figure(fig, os.path.join(out_dir, 'disjoint_split_map'))
+#     return counts
+
+
+# def plot_full_predicted_gt_original_style(gt, predicted, out_dir,
+#                                           dataset, window_size, num_classes):
+#     """Save FULL labeled-scene GT and prediction maps exactly in the original style.
+
+#     Uses the same `imshow(..., cmap='nipy_spectral')` and class-id scale for
+#     BOTH images, with unlabeled positions remaining zero. Full-scene predictions
+#     include training, validation, test and boundary-excluded labeled centers:
+#     they are for VISUALIZATION ONLY, never used to compute the held-out OA/AA.
+#     """
+#     gt = np.asarray(gt)
+#     predicted = np.asarray(predicted)
+#     if gt.ndim != 2 or predicted.shape != gt.shape:
+#         raise ValueError("GT and full-scene prediction must have the same 2-D shape")
+#     if not np.issubdtype(gt.dtype, np.integer) or not np.issubdtype(predicted.dtype, np.integer):
+#         raise ValueError("GT and predicted class IDs must be integers")
+#     if np.any((gt < 0) | (gt > num_classes)) or np.any(
+#             (predicted < 0) | (predicted > num_classes)):
+#         raise ValueError("Class IDs must be in 0..num_classes")
+#     if np.any(predicted[gt == 0] != 0):
+#         raise ValueError("Predicted GT must leave unlabeled locations zero")
+
+#     os.makedirs(out_dir, exist_ok=True)
+#     prefix = os.path.join(out_dir, f"{dataset}_ws{window_size}")
+#     for label, image in (("Ground_Truth", gt), ("Predicted_GT", predicted)):
+#         # Original main.py style, matched figure sizes and class colors.
+#         fig, ax = plt.subplots(figsize=(10, 10))
+#         ax.imshow(image, cmap='nipy_spectral', vmin=0, vmax=num_classes,
+#                   interpolation='nearest')
+#         ax.axis('off')
+#         fig.savefig(f"{prefix}_{label}.png", dpi=500, format='png',
+#                     bbox_inches='tight', pad_inches=0)
+#         fig.savefig(f"{prefix}_{label}.pdf", format='pdf',
+#                     bbox_inches='tight', pad_inches=0)
+#         plt.close(fig)
+#     np.savez_compressed(f"{prefix}_full_scene_prediction.npz",
+#                         ground_truth=gt, predicted_labels=predicted,
+#                         class_ids=np.arange(1, num_classes + 1),
+#                         visualization_only=np.array(True))
+
+
+# def plot_heldout_classification_maps(gt, coords, true_labels, pred_labels,
+#                                      names, out_dir, dataset, window_size, seed):
+#     """Simple nipy_spectral maps, showing only genuinely evaluated test centers."""
+#     gt, coords = np.asarray(gt), np.asarray(coords)
+#     actual = np.asarray(true_labels, dtype=np.int32)
+#     predicted = np.asarray(pred_labels, dtype=np.int32)
+#     n = len(names)
+#     if gt.ndim != 2 or coords.shape != (len(actual), 2) or actual.shape != predicted.shape:
+#         raise ValueError('Mismatched held-out map shapes')
+#     if np.any((actual < 1) | (actual > n)) or np.any((predicted < 1) | (predicted > n)):
+#         raise ValueError('Class IDs must be in 1..num_classes')
+#     if len(np.unique(coords, axis=0)) != len(coords):
+#         raise ValueError('Repeated test coordinates')
+#     if not np.array_equal(gt[coords[:, 0], coords[:, 1]], actual):
+#         raise ValueError('Test labels and GT coordinates disagree')
+#     r, c = coords[:, 0], coords[:, 1]
+#     test_gt = np.zeros(gt.shape, dtype=np.int32)
+#     test_pred = np.zeros(gt.shape, dtype=np.int32)
+#     correctness = np.zeros(gt.shape, dtype=np.uint8)
+#     test_gt[r, c] = actual
+#     test_pred[r, c] = predicted
+#     correctness[r, c] = np.where(actual == predicted, 1, 2).astype(np.uint8)
+#     cmap, norm, _ = _hsi_discrete_colormap(n)
+
+#     # The same no-axis imshow used in the original code. Never infer missing labels.
+#     for suffix, image in [('full_ground_truth', gt),
+#                           ('test_ground_truth', test_gt),
+#                           ('test_predictions', test_pred)]:
+#         fig, ax = plt.subplots(figsize=(8, 8))
+#         ax.imshow(image, cmap=cmap, norm=norm, interpolation='nearest')
+#         ax.axis('off')
+#         save_paper_figure(fig, os.path.join(out_dir, f'{dataset}_ws{window_size}_{suffix}'))
+
+#     # Compact comparison. Class IDs have IDENTICAL nipy_spectral colors throughout.
+#     fig, axes = plt.subplots(1, 3, figsize=(13.5, 5.0))
+#     for ax, (image, title) in zip(axes, [(gt, 'Original ground truth'),
+#                                           (test_gt, 'Held-out test labels'),
+#                                           (test_pred, 'Held-out test predictions')]):
+#         ax.imshow(image, cmap=cmap, norm=norm, interpolation='nearest')
+#         ax.set_title(title, fontsize=11)
+#         ax.axis('off')
+#     fig.tight_layout(pad=0.3)
+#     save_paper_figure(fig, os.path.join(out_dir,
+#                                         f'{dataset}_ws{window_size}_heldout_classification'))
+#     # 0 = no held-out test center; not a negative prediction, and not class 1.
+#     return {'test_ground_truth': test_gt, 'test_predictions': test_pred,
+#             'correctness': correctness, 'correct_count': int(np.sum(actual == predicted))}
+
+
+# def plot_test_confusion(true_labels, pred_labels, names, out_dir,
+#                         dataset, window_size, seed):
+#     """Confusion percentages on the true-class rows. Colormap nipy_spectral."""
+#     n = len(names)
+#     cm = confusion_matrix(true_labels, pred_labels, labels=np.arange(1, n + 1))
+#     support = cm.sum(axis=1)
+#     matrix = np.divide(cm * 100., support[:, None],
+#                        out=np.full(cm.shape, np.nan, dtype=float),
+#                        where=support[:, None] != 0)
+#     fig, ax = plt.subplots(figsize=(max(7, n*0.52+2), max(6.5, n*0.45+1.6)))
+#     im = ax.imshow(np.ma.masked_invalid(matrix), cmap='nipy_spectral',
+#                    vmin=0, vmax=100, interpolation='nearest', aspect='auto')
+#     ax.set_xticks(range(n), [str(i) for i in range(1, n + 1)])
+#     ax.set_yticks(range(n), [f'{i+1} {name} (n={support[i]:,})'
+#                              for i, name in enumerate(names)], fontsize=8)
+#     ax.set_xlabel('Predicted class ID')
+#     ax.set_ylabel('True class')
+#     for i in range(n):
+#         if support[i] == 0:
+#             ax.text(i, i, 'N/A', ha='center', va='center', fontsize=7)
+#         elif matrix[i, i] >= 1:
+#             ax.text(i, i, f'{matrix[i,i]:.0f}', ha='center', va='center', fontsize=8)
+#     fig.colorbar(im, ax=ax, fraction=.037, pad=.02, label='Row-normalized (%)')
+#     fig.tight_layout()
+#     save_paper_figure(fig, os.path.join(out_dir,
+#                                         f'{dataset}_ws{window_size}_test_confusion'))
+#     np.savetxt(os.path.join(out_dir, f'{dataset}_ws{window_size}_confusion_counts.csv'),
+#                cm, fmt='%d', delimiter=',')
+#     return cm
+
+
+# def plot_class_recall(cm, names, out_dir, dataset, window_size, seed):
+#     support = np.asarray(cm).sum(axis=1)
+#     recall = np.divide(np.diag(cm)*100., support,
+#                        out=np.full(len(names), np.nan), where=support != 0)
+#     fig, ax = plt.subplots(figsize=(10, max(4, len(names)*.35+1.5)))
+#     y = np.arange(len(names))
+#     ax.barh(y, np.nan_to_num(recall), color=_hsi_class_palette(len(names)))
+#     ax.set_yticks(y, [f'{i+1:02d} {name}' for i,name in enumerate(names)], fontsize=8)
+#     ax.invert_yaxis()
+#     ax.set_xlim(0, 118)
+#     ax.set_xlabel('Held-out test recall (%)')
+#     for i, (value, count) in enumerate(zip(recall, support)):
+#         ax.text(101, i, f'n={count:,}', va='center', fontsize=8)
+#     fig.tight_layout()
+#     save_paper_figure(fig, os.path.join(out_dir,
+#                                         f'{dataset}_ws{window_size}_per_class_recall'))
+#     return recall
+
+
+# def plot_learning_curves(hist, out_dir, dataset, window_size, seed):
+#     hist = hist.history if hasattr(hist, 'history') else hist
+#     epochs = np.arange(1, len(hist['loss']) + 1)
+#     cmap = plt.get_cmap('nipy_spectral')
+#     fig, axs = plt.subplots(1, 2, figsize=(8.6, 3.6))
+#     for name, ax, factor in [('loss', axs[0], 1), ('accuracy', axs[1], 100)]:
+#         ax.plot(epochs, np.asarray(hist[name])*factor, label='Train',
+#                 color=cmap(.32), linewidth=2)
+#         if 'val_'+name in hist:
+#             ax.plot(epochs, np.asarray(hist['val_'+name])*factor,
+#                     label='Validation', color=cmap(.72), linestyle='--', linewidth=2)
+#         ax.set_xlabel('Epoch')
+#         ax.set_ylabel('Loss' if name == 'loss' else 'Accuracy (%)')
+#         ax.set_title('Loss' if name == 'loss' else 'Accuracy')
+#         ax.legend(frameon=False, fontsize=9)
+#         if len(epochs) <= 12:
+#             ax.set_xticks(epochs)
+#     axs[1].set_ylim(0, 100)
+#     fig.tight_layout()
+#     save_paper_figure(fig, os.path.join(out_dir,
+#                                         f'{dataset}_ws{window_size}_learning_curves'))
+
 # #Create an ArgumentParser object
 # parser = argparse.ArgumentParser(description="Script Description")
 # # Add arguments for each parameter
@@ -2181,7 +2630,7 @@ tf.keras.backend.clear_session()
 # parser.add_argument(
 #     "--batch_size", "-bs", type=int, default=56, help="Batch size for training"
 # )
-# parser.add_argument("--block_size", type=int, default=32,
+# parser.add_argument("--block_size", type=int, default=16,
 #                     help="Side length of assigned non-overlapping spatial blocks")
 # parser.add_argument("--spatial_buffer", type=int, default=0,
 #                     help="Extra source pixels to exclude around each partition boundary")
@@ -2193,8 +2642,8 @@ tf.keras.backend.clear_session()
 #                     help="Optional fixed spatial split seed (defaults to --seed)")
 # parser.add_argument("--deterministic", action="store_true",
 #                     help="Request TensorFlow deterministic GPU operations (may reduce performance)")
-# parser.add_argument("--prediction_map", choices=["none", "test", "full"], default="none",
-#                     help="Map mode; 'test' reuses predictions, 'full' is expensive")
+# parser.add_argument("--prediction_map", choices=["none", "test", "full"], default="test",
+#                     help="Map mode: test/full save held-out and full predicted-GT visualizations; none skips maps")
 # parser.add_argument("--verify_split_only", action="store_true",
 #                     help="Verify the spatial split and exit without PCA or model training")
 # # Parse the command-line arguments
@@ -2343,7 +2792,7 @@ tf.keras.backend.clear_session()
 # # output_dir = os.path.join(f"Spaital_Spectral_Kan_Mamba/{HSID}/window_size/{WS}")
 # output_dir = os.path.join(
 #     f"KanMamba_{num_heads}_chnal_{out_channels}_bs_{batch_size}",
-#     HSID, str(WS), "arch_original_dima_ssm_tokenfix", f"split_{args.split_seed}",
+#     HSID, str(WS), "arch_original", f"split_{args.split_seed}",
 #     f"seed_{args.seed}")
 # if not os.path.exists(output_dir):
 #       os.makedirs(output_dir)
@@ -2392,13 +2841,9 @@ tf.keras.backend.clear_session()
 #                       "pre-register how sparse classes are handled before publication")
 # # verify_disjoint_footprints is also called internally by disjoint_spatial_split.
 
-# fig, ax = plt.subplots(figsize=(7, 7))
-# ax.imshow(split_map, cmap=ListedColormap(["#222222", "#4082c4", "#f2af32", "#d94c4c"]),
-#           interpolation="nearest", vmin=0, vmax=3)
-# ax.set_title("Spatially disjoint pixel-center partitions: train / val / test")
-# ax.axis("off")
-# fig.savefig(os.path.join(output_dir, "disjoint_split_map.png"), dpi=250, bbox_inches="tight")
-# plt.close(fig)
+# # Publication split figure: distinguishes unlabeled from excluded labeled centers.
+# # Colors describe center allocation, NOT all input pixels of the patches.
+# plot_spatial_partition(GT, split_map, HSID, WS, args.split_seed, output_dir)
 
 # if args.verify_split_only:
 #     print("Split-only verification completed. No PCA or network training performed.")
@@ -2708,97 +3153,148 @@ tf.keras.backend.clear_session()
 #     # Build the model by passing a batch of data
 #     _ = model(Tr[:batch_size])  # Ensures model is built correctly
 #     return model
-#  # Flops Calculation
-# def get_flops(model):
-#     total_flops = 0
+# # Reproducible analytical MAC accounting for the EXACT two-branch model.
+# # A multiply-accumulate (MAC) is reported as 2 FLOPs by convention. This
+# # intentionally excludes RBF exponentials, softmax, normalization, biases,
+# # activation functions, gating multiplies and any kernel-level overhead.
+# # Thus 2*MAC is NOT the complete floating-point-operation count.
+# def estimate_mac_flops(window_size, bands, num_classes, token_dim, heads,
+#                        state_dim, qkv_grids, gate_grids,
+#                        qkv_use_base=False, gate_use_base=True):
+#     """Count executed matrix MACs for one HSI patch, not model layers once.
 
-#     def process_layer(layer):
-#         nonlocal total_flops
-#         flops = 0
+#     The two attention calls SHARE weights but EACH incurs compute. The affine
+#     recurrence performs its two Dense projections once at EVERY token.
+#     No tensor tracing, data, or GPU is required for this operation count.
+#     """
+#     values = (window_size, bands, num_classes, token_dim, heads,
+#               state_dim, qkv_grids, gate_grids)
+#     if not all(isinstance(v, int) and v > 0 for v in values):
+#         raise ValueError('MAC profile dimensions must be positive integers')
+#     if token_dim % heads:
+#         raise ValueError('token_dim must be divisible by heads')
+#     n = window_size * window_size
+#     d, s, c = token_dim, state_dim, bands
+#     # All counted operations below are matrix products only (multiply-adds).
+#     ops = {
+#         'token_projections': 2 * n * c * d,
+#         'gate_spline': 2 * d * gate_grids * d,  # both gates; one center token
+#         'gate_base': (2 * d * d if gate_use_base else 0),
+#         'attention_qkv_spline': 2 * 3 * n * d * qkv_grids * d,
+#         'attention_qkv_base': (2 * 3 * n * d * d if qkv_use_base else 0),
+#         'attention_scores': 2 * n * n * d,  # QK^T: two attention calls
+#         'attention_value_mix': 2 * n * n * d,  # softmax(QK^T)V: two calls
+#         'attention_output_projection': 2 * n * d * d,
+#         'recurrent_transition': n * s * s,
+#         'recurrent_input': n * (2 * d) * s,  # concatenated two branches
+#         'classifier': s * num_classes,
+#     }
+#     total = sum(ops.values())
+#     return {
+#         'sequence_length': n,
+#         'mac_breakdown': ops,
+#         'macs_per_patch': total,
+#         'mac_equivalent_flops_per_patch': 2 * total,
+#         'mac_equivalent_gflops_per_patch': 2 * total / 1e9,
+#         'method': 'Analytical, 1 multiply-accumulate = 2 FLOPs, per patch; '
+#                   'weights shared across 2 executed attention calls',
+#         'includes': 'Dense/SplineLinear/QKV/attention score/value matrix '
+#                     'products; recurrent matrices at all N time steps',
+#         'excludes': 'RBF exp/basis arithmetic, LayerNorm, softmax, '
+#                     'sigmoid/swish, biases, gating/additions; NOT total FLOPs',
+#         'safe_to_claim_exact_total_flops': False,
+#     }
 
-#         # Handle Conv2D layers
-#         if isinstance(layer, tf.keras.layers.Conv2D):
-#             input_channels = layer.input_shape[-1] if layer.input_shape is not None else 0
-#             output_height = layer.output_shape[1] if layer.output_shape is not None else 0
-#             output_width = layer.output_shape[2] if layer.output_shape is not None else 0
-#             kernel_size = layer.kernel_size[0] * layer.kernel_size[1] * input_channels
-#             flops += kernel_size * output_height * output_width * layer.filters
 
-#         # Handle Dense layers
-#         elif isinstance(layer, tf.keras.layers.Dense):
-#             output_dim = layer.units
-#             # Use weights to infer input_dim if input_shape is unavailable
-#             input_dim = layer.get_weights()[0].shape[0] if layer.get_weights() else 0
-#             flops += 2 * input_dim * output_dim  # Multiplications + additions
-#             if layer.activation is not None and layer.activation.__name__ != 'linear':
-#                 flops += input_dim  # Approximate activation cost
+# def estimate_instantiated_model_macs(model, window_size, bands):
+#     """Read all relevant dimensions from the BUILT model, not hardcoded CLI."""
+#     token_dim = int(model.token_generation.spatial_tokens.units)
+#     attn = model.multi_head_attention
+#     gate = model.feature_enhancement.spatial_gate.layers[0]
+#     q = attn.query_kan
+#     state_dim = int(model.state_space_model.state_dim)
+#     classes = int(model.classifier.units)
+#     # Abort instead of emitting plausible but invalid counts for a new variant.
+#     if int(model.token_generation.spectral_tokens.units) != token_dim:
+#         raise ValueError('Unexpected token projection sizes')
+#     if any(x.input_dim != token_dim or x.output_dim != token_dim
+#            for x in (attn.query_kan, attn.key_kan, attn.value_kan)):
+#         raise ValueError('Unexpected attention projection architecture')
+#     if int(attn.all_head_size) != token_dim:
+#         raise ValueError('Attention projections do not have token_dim outputs')
+#     if any(g.input_dim != token_dim or g.output_dim != token_dim
+#            for g in (gate, model.feature_enhancement.spectral_gate.layers[0])):
+#         raise ValueError('Unexpected feature enhancement gate dimensions')
+#     if int(model.state_space_model.state_update.kernel.shape[0]) != 2 * token_dim:
+#         raise ValueError('Unexpected recurrent input dimension')
+#     if int(model.state_space_model.state_transition.kernel.shape[0]) != state_dim:
+#         raise ValueError('Unexpected state transition dimension')
+#     if int(model.classifier.kernel.shape[0]) != state_dim:
+#         raise ValueError('Unexpected classifier dimension')
+#     return estimate_mac_flops(
+#         window_size=int(window_size), bands=int(bands), num_classes=classes,
+#         token_dim=token_dim, heads=int(attn.num_heads), state_dim=state_dim,
+#         qkv_grids=int(q.rbf.num_grids), gate_grids=int(gate.rbf.num_grids),
+#         qkv_use_base=bool(q.use_base_update),
+#         gate_use_base=bool(gate.use_base_update),
+#     )
 
-#         # Handle SplineLinear
-#         elif isinstance(layer, SplineLinear):
-#             flops += layer.in_features * layer.out_features
 
-#         # Handle RadialBasisFunction
-#         elif isinstance(layer, RadialBasisFunction):
-#             input_dim = layer.get_weights()[0].shape[0] if layer.get_weights() else 0
-#             flops += 4 * input_dim * layer.num_grids  # Subtraction, squaring, division, exp
+# def plot_mac_breakdown(profile, out_dir, dataset, window_size):
+#     """Operation-group comparison using nipy_spectral only."""
+#     items = profile['mac_breakdown']
+#     labels, values = list(items), [2 * v / 1e6 for v in items.values()]
+#     n = len(labels)
+#     cmap = plt.get_cmap('nipy_spectral')
+#     fig, ax = plt.subplots(figsize=(10.2, 5.7))
+#     y = np.arange(n)
+#     ax.barh(y, values, color=[cmap((i + 1) / (n + 1)) for i in range(n)])
+#     ax.set_yticks(y, [x.replace('_', ' ') for x in labels], fontsize=8)
+#     ax.invert_yaxis()
+#     ax.set_xlabel('Matrix-operation FLOPs equivalent (million; 2 per MAC)')
+#     ax.set_title(f'{dataset}, {window_size}x{window_size} patch — executed matrix operations')
+#     fig.tight_layout()
+#     save_paper_figure(fig, os.path.join(out_dir,
+#                       f'{dataset}_ws{window_size}_matrix_flops_breakdown'))
 
-#         # Handle FastKANLayer
-#         elif isinstance(layer, FastKANLayer):
-#             input_dim = layer.input_dim
-#             output_dim = layer.output_dim
-#             num_grids = layer.rbf.num_grids
-#             if layer.use_layernorm:
-#                 flops += 2 * input_dim
-#             rbf_flops = 4 * input_dim * num_grids
-#             spline_flops = input_dim * num_grids * output_dim
-#             base_flops = 0
-#             if layer.use_base_update:
-#                 base_flops += input_dim * output_dim
-#                 base_flops += input_dim
-#             flops += rbf_flops + spline_flops + base_flops
+# # FLOPs: ONE forward prediction on ONE (WS, WS, k) patch, float32.
+# # Standard TF graph-profiler count; NOT the previously incorrect hand count.
+# def profile_model_flops(model, window_size, bands):
+#     """Return TensorFlow graph-profiled float operations per sample.
 
-#         # Handle SpectralSpatialTokenGeneration
-#         elif isinstance(layer, SpectralSpatialTokenGeneration):
-#             flops += process_layer(layer.spatial_tokens)  # Dense layer
-#             flops += process_layer(layer.spectral_tokens)  # Dense layer
+#     Caveat: TF's static graph profiler can miss Exp/softmax and operations
+#     inside While/StatelessWhile (including recurrent loops). Such numbers
+#     are graph-profiler estimates, NOT exact hardware FLOP measurements.
+#     """
+#     from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
 
-#         # Handle MultiHeadKANAttention
-#         elif isinstance(layer, MultiHeadKANAttention):
-#             flops += process_layer(layer.query_kan)  # FastKANLayer
-#             flops += process_layer(layer.key_kan)    # FastKANLayer
-#             flops += process_layer(layer.value_kan)  # FastKANLayer
-#             flops += process_layer(layer.output_projection)  # Dense layer
-#             if layer.output_activation:
-#                 flops += layer.output_dim  # Activation cost
-#         # Handle SpectralSpatialFeatureEnhancement
-#         elif isinstance(layer, SpectralSpatialFeatureEnhancement):
-#             flops += process_layer(layer.spatial_gate)  # Sequential with FastKANLayer and Activation
-#             flops += process_layer(layer.spectral_gate)  # Sequential with FastKANLayer and Activation
+#     @tf.function(input_signature=[tf.TensorSpec(
+#         shape=[1, window_size, window_size, bands], dtype=tf.float32)])
+#     def inference(patch):
+#         return model(patch, training=False)
 
-#         # Handle StateSpaceModel
-#         elif isinstance(layer, StateSpaceModel):
-#             flops += process_layer(layer.state_transition)  # Dense layer
-#             flops += process_layer(layer.state_update)      # Dense layer
-
-#         # Handle Sequential or nested models
-#         elif isinstance(layer, tf.keras.Sequential) or hasattr(layer, 'layers'):
-#             for sublayer in layer.layers:
-#                 flops += process_layer(sublayer)
-
-#         # Recursively process tf.keras.Model
-#         elif isinstance(layer, tf.keras.Model):
-#             for sublayer in layer.layers:
-#                 flops += process_layer(sublayer)
-
-#         total_flops += flops
-#         print(f"Layer {layer.name}: {flops} FLOPs")
-#         return flops
-
-#     process_layer(model)
-#     return total_flops
-
-# def compute_flops(model):
-#     return get_flops(model)
+#     concrete = inference.get_concrete_function()
+#     frozen = convert_variables_to_constants_v2(concrete)
+#     graph_def = frozen.graph.as_graph_def()
+#     graph_ops = {node.op for node in graph_def.node}
+#     # Without unfolding recurrent loops, graph FLOPs are a LOWER BOUND.
+#     control_flow = bool(graph_ops & {'While', 'StatelessWhile', 'If', 'StatelessIf'})
+#     graph = tf.Graph()
+#     with graph.as_default():
+#         tf.compat.v1.import_graph_def(graph_def, name='')
+#         opts = tf.compat.v1.profiler.ProfileOptionBuilder.float_operation()
+#         opts['output'] = 'none'
+#         report = tf.compat.v1.profiler.profile(graph=graph, cmd='op', options=opts)
+#     if report is None or report.total_float_ops is None or report.total_float_ops <= 0:
+#         raise RuntimeError('TensorFlow graph profiler returned no usable operation count')
+#     return {'graph_profiled_flops_per_patch': int(report.total_float_ops),
+#             'graph_profiled_gflops_per_patch': float(report.total_float_ops)/1e9,
+#             'input_shape': [1, int(window_size), int(window_size), int(bands)],
+#             'method': 'tf.compat.v1.profiler float_operation, frozen inference graph, batch=1',
+#             'contains_control_flow': control_flow,
+#             'limitations': ('Control-flow bodies may be undercounted; graph profiling also '
+#                             'omits some non-MAC operations. Do not cite as exact FLOPs.'),
+#             'safe_to_claim_exact_flops': False}
 
 # # Train and Evaluate Model
 # def train_and_evaluate_model(model_name, Tr, TrC, Va, VaC, Te, TeC, adam, HSID, teRatio, k, WS, DLM, RDHSI, GT,batch_size,epochs,output_dir):
@@ -2851,14 +3347,35 @@ tf.keras.backend.clear_session()
 #     file_name = f"{HSID}_{teRatio}_{vrRatio}_{k}_{WS}_{DLM}_model_summary_of_{model_name.__name__}.txt"
 #     # Assuming `model` is your Keras model
 #     total_params = model.count_params()
-#     # The former manual 'get_flops' omitted attention matrix multiplications,
-#     # softmax, recurrence and other operations. Do not report its output as FLOPs.
-#     # Profile real FLOPs under a fixed input/batch with TensorFlow Profiler later.
+#     # Exact executed matrix-MAC counts for this fixed architecture. Not total FLOPs.
+#     mac_profile = estimate_instantiated_model_macs(model, WS, k)
+#     print(f"Analytical executed matrix MACs/patch: {mac_profile['macs_per_patch']:,}; "
+#           f"2-FLOP/MAC equivalent: {mac_profile['mac_equivalent_gflops_per_patch']:.6f} GFLOPs "
+#           '(excludes RBF/softmax/normalization).', flush=True)
+#     # Independent TensorFlow graph profile: may undercount control flow.
+#     try:
+#         flop_profile = profile_model_flops(model, WS, k)
+#         print(f"TF graph-profiled FLOPs/patch: "
+#               f"{flop_profile['graph_profiled_flops_per_patch']:,} "
+#               f"({flop_profile['graph_profiled_gflops_per_patch']:.6f} GFLOPs)")
+#         if flop_profile['contains_control_flow']:
+#             print('WARNING: recurrent/control-flow FLOPs may be undercounted; '
+#                   'do not cite the graph count as total model FLOPs.')
+#     except Exception as exc:
+#         flop_profile = {'graph_profiled_flops_per_patch': None,
+#                         'error': f'{type(exc).__name__}: {exc}',
+#                         'method': 'TF frozen-graph inference profiler; batch=1',
+#                         'safe_to_claim_exact_flops': False}
+#         warnings.warn(f'FLOPs profiling unavailable: {exc}')
 #     with open(os.path.join(output_dir, file_name),'w') as fh:
-#         # Pass the file handle in as a lambda function to make it callable
 #         model.summary(print_fn=lambda x: fh.write(x + '\n'))
 #         fh.write(f"\nTotal Parameters: {total_params}\n")
-#         fh.write("FLOPs: not measured (requires a real profiler; legacy estimate removed)\n")
+#         fh.write(f"Analytical matrix MAC profile: {json.dumps(mac_profile, indent=2)}\n")
+#         fh.write(f"FLOPs graph profiling: {json.dumps(flop_profile, indent=2)}\n")
+#     with open(os.path.join(output_dir, 'flops_profile.json'), 'w') as fh:
+#         json.dump({'model': model_name.__name__, 'parameters': total_params,
+#                    'analytical_matrix_macs': mac_profile,
+#                    'tf_graph_profile': flop_profile}, fh, indent=2)
     
 #     # Compiling the model (모델의 loss, optimizer, metrics 설정)
 #     model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
@@ -2896,7 +3413,7 @@ tf.keras.backend.clear_session()
 #     # sns.set(style="whitegrid")
 #     # # Plot tSNE
 #     # plt.figure(figsize=(8, 5))
-#     # plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], c=TrC.argmax(axis=1), cmap='viridis')
+#     # Optional embedding plot omitted; paper uses nipy_spectral exclusively
 #     # plt.title(f'tSNE: {HSID}', fontsize=12, fontweight='bold')
 #     # plt.xlabel('tSNE-1', fontsize=12, fontweight='bold')
 #     # plt.ylabel('tSNE-2', fontsize=12, fontweight='bold')
@@ -2909,22 +3426,63 @@ tf.keras.backend.clear_session()
 #     # file_name = f"{HSID}_{trRatio}_{k}_{WS}_tsne.png"
 #     # plt.savefig(os.path.join(output_dir, file_name), dpi=500, format='png', bbox_inches='tight', pad_inches=0)
     
-#     # Do not run a hidden second whole-image inference pass by default.
-#     if args.prediction_map != "none":
-#         print(f"Creating {args.prediction_map} prediction map...", flush=True)
-#         if args.prediction_map == "test":
-#             outputs = np.zeros(GT.shape, dtype=np.int32)
-#             outputs[Te_xy[:, 0], Te_xy[:, 1]] = np.argmax(Te_Pre, axis=1) + 1
-#         else:
-#             outputs = predict_labeled_map_in_batches(RDHSI, GT, model, WS,
-#                                                       batch_size=batch_size)
-#         fig, ax = plt.subplots(figsize=(10, 10))
-#         ax.imshow(outputs, cmap='nipy_spectral')
-#         ax.axis('off')
-#         file_name = f"{HSID}_{args.prediction_map}_{WS}_prediction_map.png"
-#         fig.savefig(os.path.join(output_dir, file_name), dpi=250,
-#                     format='png', bbox_inches='tight', pad_inches=0)
-#         plt.close(fig)
+#     # Paper figures are strictly based on held-out test predictions (not train/val).
+#     fig_dir = os.path.join(output_dir, "paper_figures")
+#     os.makedirs(fig_dir, exist_ok=True)
+#     pred_ids = np.argmax(Te_Pre, axis=1).astype(np.int32) + 1
+#     truth_ids = np.argmax(TeC, axis=1).astype(np.int32) + 1
+#     plot_learning_curves(history, fig_dir, HSID, WS, args.seed)
+#     plot_mac_breakdown(mac_profile, fig_dir, HSID, WS)
+#     with open(os.path.join(fig_dir, 'matrix_flops_components.csv'), 'w') as handle:
+#         handle.write('component,macs,2_flops_per_mac_equivalent\n')
+#         for component, macs in mac_profile['mac_breakdown'].items():
+#             handle.write(f'{component},{macs},{2*macs}\n')
+#     cm_test = plot_test_confusion(truth_ids, pred_ids, target_names,
+#                                   fig_dir, HSID, WS, args.split_seed)
+#     plot_class_recall(cm_test, target_names, fig_dir, HSID, WS, args.split_seed)
+#     with open(os.path.join(fig_dir, 'class_color_key.csv'), 'w', encoding='utf-8') as handle:
+#         handle.write('class_id,class_name,color_hex\n')
+#         for class_id, (class_name, rgb) in enumerate(
+#                 zip(target_names, _hsi_class_palette(Num_Classes)), start=1):
+#             handle.write(f'{class_id},{json.dumps(class_name, ensure_ascii=False)},{to_hex(rgb)}\n')
+#     # Avoid an extra prediction pass for the scientifically valid test-only maps.
+#     if args.prediction_map in ("test", "full"):
+#         paper_maps = plot_heldout_classification_maps(
+#             GT, Te_xy, truth_ids, pred_ids, target_names,
+#             fig_dir, HSID, WS, args.split_seed)
+#         # Save pixel-aligned arrays for further visualization or exact audit.
+#         np.savez_compressed(os.path.join(fig_dir, "heldout_test_prediction_map.npz"),
+#                             true_test_map=paper_maps["test_ground_truth"],
+#                             predicted_test_map=paper_maps["test_predictions"],
+#                             correctness_map=paper_maps["correctness"],
+#                             test_coords=Te_xy, class_names=np.asarray(target_names))
+#     if args.prediction_map in ("test", "full"):
+#         # Match original GT_Plot visualization: predict all GT-labeled pixels.
+#         # This is NOT the held-out test map; test metrics above use Te_Pre only.
+#         print("Generating full predicted GT (visualization only; no test-score impact)...",
+#               flush=True)
+#         full_prediction = predict_labeled_map_in_batches(
+#             RDHSI, GT, model, WS, batch_size=max(256, batch_size))
+#         plot_full_predicted_gt_original_style(
+#             GT, full_prediction, fig_dir, HSID, WS, Num_Classes)
+#         print("Saved GT and predicted GT in original nipy_spectral style.", flush=True)
+#     with open(os.path.join(fig_dir, 'figure_protocol.json'), 'w') as handle:
+#         json.dump({
+#             'dataset': HSID, 'window_size': int(WS),
+#             'split_seed': int(args.split_seed), 'model_seed': int(args.seed),
+#             'test_count': int(len(truth_ids)),
+#             'test_correct_count': int(np.sum(truth_ids == pred_ids)),
+#             'test_predictions_only': True,
+#             'unplotted_test_pixel_value': 0,
+#             'class_labels_are_one_based': True,
+#             'classification_maps': ('test-only; non-test pixels masked'
+#                                     if args.prediction_map != 'none' else 'disabled'),
+#             'full_scene_if_present': 'visualization only; includes training, validation and excluded centers',
+#             'full_scene_figures_generated': bool(args.prediction_map in ('test', 'full')),
+
+#             'model_selection': 'last epoch (no early stopping, no best-weight restoration)'
+#         }, handle, indent=2)
+#     print('Saved publication figures under', fig_dir, flush=True)
 #     # One machine-readable record per seed; do not silently overwrite between runs.
 #     run_metrics = {
 #         "dataset": HSID, "window_size": int(WS),
@@ -2943,7 +3501,9 @@ tf.keras.backend.clear_session()
 #         "test_class_support": {str(c): int(n) for c, n in zip(*np.unique(GT[Te_xy[:, 0], Te_xy[:, 1]], return_counts=True))},
 #         "OA": float(OA), "AA": float(AA), "Kappa": float(Kappa),
 #         "training_seconds": float(Tr_Time), "test_prediction_seconds": float(Te_Time),
-#         "parameters": int(total_params), "max_epochs": int(epochs),
+#         "parameters": int(total_params), "analytical_matrix_macs": mac_profile,
+#         "flops_profile": flop_profile,
+#         "max_epochs": int(epochs),
 #         "actual_epochs": int(len(history.history["loss"])),
 #         "best_validation_epoch": int(np.argmin(history.history["val_loss"]) + 1),
 #         "train_ratio_input": float(trRatio), "validation_ratio_input": float(vrRatio),
@@ -3005,26 +3565,6 @@ tf.keras.backend.clear_session()
 # with open(all_results_output_path, 'w') as json_file:
 #     json_file.write(json_data)
 
-# # Plot training and validation loss and accuracy for each model
-# fig, axs = plt.subplots(1, 2, figsize=(8, 3))
-# colors = ['brown','red','blue','gray', 'green', 'purple', 'orange']
-# for i, history in enumerate(history_list):
-#     # Plot loss
-#     axs[0].plot(history.history['loss'], label=f'{model_names[i].__name__} Train', color=colors[i])
-#     axs[0].plot(history.history['val_loss'], label=f'{model_names[i].__name__} Val', color=colors[i], linestyle='--')
-#     # Plot accuracy
-#     axs[1].plot(history.history['accuracy'], label=f'{model_names[i].__name__} Train', color=colors[i])
-#     axs[1].plot(history.history['val_accuracy'], label=f'{model_names[i].__name__} Val', color=colors[i], linestyle='--')
-# axs[0].set_title('Loss', fontsize=10)
-# axs[0].set_xlabel('Epoch', fontsize=10)
-# axs[1].set_title('Accuracy', fontsize=10)
-# axs[1].set_xlabel('Epoch', fontsize=10)
-# axs[1].legend(fontsize=6)
-# axs[0].grid(True)
-# axs[1].grid(True)
-# plt.tight_layout()
-# file_name = f"{HSID}_{teRatio}_{k}_{WS}_{DLM}_acc_loss_curve_all_models.png"
-# plt.savefig(os.path.join(output_dir, file_name), dpi=500, format='png', bbox_inches='tight', pad_inches=0)
+# # Publication learning curves and other figures are generated inside
+# # train_and_evaluate_model using only the current run's actual arrays.
 # tf.keras.backend.clear_session()
-
-
