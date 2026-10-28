@@ -1,0 +1,17 @@
+class_id,class_name,color_hex
+1,"Strawberry",#7b008c
+2,"Cowpea",#4300a2
+3,"Soybean",#0000d1
+4,"Sorghum",#0078dd
+5,"Water spinach",#009ecf
+6,"Watermelon",#00aa98
+7,"Greens",#009d1d
+8,"Trees",#00bc00
+9,"Grass",#00e700
+10,"Red roof",#67ff00
+11,"Gray roof",#e4f100
+12,"Plastic",#ffc900
+13,"Bare soil",#ff6900
+14,"Road",#ec0000
+15,"Bright object",#cf0000
+16,"Water",#cccccc

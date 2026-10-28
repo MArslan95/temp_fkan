@@ -1,4 +1,4 @@
-datasets/
+hsi_datasets/
 *.log
 *.ckpt  
 /paper/*
@@ -21,11 +21,10 @@ datasets/
 .vscode/
 __pycache__/
 models/
-results_*/
 revision_artifacts/
 revision/tools/
 revision/qa/
 revision/*.log
 !/revision/reference/models/
 !/revision/reference/models/*.py
-hsi_datasets/*
+

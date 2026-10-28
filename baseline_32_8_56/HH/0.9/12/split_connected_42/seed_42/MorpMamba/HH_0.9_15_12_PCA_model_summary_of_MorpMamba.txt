@@ -1,0 +1,37 @@
+Model: "morp_ss_mamba_model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ spectral_spatial_token_gen  multiple                  3334      
+ eration (SpectralSpatialTo                                      
+ kenGeneration)                                                  
+                                                                 
+ multi_head_attention (Mult  multiple                  12480     
+ iHeadAttention)                                                 
+                                                                 
+ morp_spectral_spatial_feat  multiple                  8320      
+ ure_enhancement (MorpSpect                                      
+ ralSpatialFeatureEnhanceme                                      
+ nt)                                                             
+                                                                 
+ state_space_model (StateSp  multiple                  8320      
+ aceModel)                                                       
+                                                                 
+ dense_7 (Dense)             multiple                  8320      
+                                                                 
+ dropout_1 (Dropout)         multiple                  0 (unused)
+                                                                 
+ dense_8 (Dense)             multiple                  2838      
+                                                                 
+=================================================================
+Total params: 43612 (170.36 KB)
+Trainable params: 43612 (170.36 KB)
+Non-trainable params: 0 (0.00 Byte)
+_________________________________________________________________
+
+Total Parameters: 43612
+
+Total Parameters: 43612
+Trainable Parameters: 43612
+Non-trainable Parameters: 0
+FLOPs (batch=1): 11647585

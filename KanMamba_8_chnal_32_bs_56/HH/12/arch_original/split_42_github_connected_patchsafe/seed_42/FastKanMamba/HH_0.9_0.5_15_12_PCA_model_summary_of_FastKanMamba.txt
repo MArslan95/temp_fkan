@@ -1,0 +1,68 @@
+Model: "ssfks_mamba_model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ spectral_spatial_token_gen  multiple                  1024      
+ eration (SpectralSpatialTo                                      
+ kenGeneration)                                                  
+                                                                 
+ multi_head_kan_attention (  multiple                  25848     
+ MultiHeadKANAttention)                                          
+                                                                 
+ spectral_spatial_feature_e  multiple                  18640     
+ nhancement (SpectralSpatia                                      
+ lFeatureEnhancement)                                            
+                                                                 
+ state_space_model (StateSp  multiple                  8320      
+ aceModel)                                                       
+                                                                 
+ dense_7 (Dense)             multiple                  0 (unused)
+                                                                 
+ dropout_1 (Dropout)         multiple                  0 (unused)
+                                                                 
+ dense_8 (Dense)             multiple                  1430      
+                                                                 
+=================================================================
+Total params: 55262 (215.87 KB)
+Trainable params: 55262 (215.87 KB)
+Non-trainable params: 0 (0.00 Byte)
+_________________________________________________________________
+
+Total Parameters: 55262
+Analytical matrix MAC profile: {
+  "sequence_length": 144,
+  "mac_breakdown": {
+    "token_projections": 138240,
+    "gate_spline": 16384,
+    "gate_base": 2048,
+    "attention_qkv_spline": 7077888,
+    "attention_qkv_base": 0,
+    "attention_scores": 1327104,
+    "attention_value_mix": 1327104,
+    "attention_output_projection": 294912,
+    "recurrent_transition": 589824,
+    "recurrent_input": 589824,
+    "classifier": 1408
+  },
+  "macs_per_patch": 11364736,
+  "mac_equivalent_flops_per_patch": 22729472,
+  "mac_equivalent_gflops_per_patch": 0.022729472,
+  "method": "Analytical, 1 multiply-accumulate = 2 FLOPs, per patch; weights shared across 2 executed attention calls",
+  "includes": "Dense/SplineLinear/QKV/attention score/value matrix products; recurrent matrices at all N time steps",
+  "excludes": "RBF exp/basis arithmetic, LayerNorm, softmax, sigmoid/swish, biases, gating/additions; NOT total FLOPs",
+  "safe_to_claim_exact_total_flops": false
+}
+FLOPs graph profiling: {
+  "graph_profiled_flops_per_patch": 23328132,
+  "graph_profiled_gflops_per_patch": 0.023328132,
+  "input_shape": [
+    1,
+    12,
+    12,
+    15
+  ],
+  "method": "tf.compat.v1.profiler float_operation, frozen inference graph, batch=1",
+  "contains_control_flow": false,
+  "limitations": "Control-flow bodies may be undercounted; graph profiling also omits some non-MAC operations. Do not cite as exact FLOPs.",
+  "safe_to_claim_exact_flops": false
+}
