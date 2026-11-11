@@ -1,0 +1,7 @@
+class_id,class_name,color_hex
+1,"Trees",#0000b9
+2,"Concrete building",#00a4bb
+3,"Car",#00bc00
+4,"Ironhide building",#ccf900
+5,"Plastic playground",#ff2d00
+6,"Asphalt road",#cccccc

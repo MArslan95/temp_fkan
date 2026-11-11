@@ -1,0 +1,109 @@
+{
+  "dataset": "QUH",
+  "window_size": 12,
+  "python_version": "3.10.4",
+  "tensorflow_version": "2.15.1",
+  "numpy_version": "1.26.4",
+  "visible_gpus": [
+    "/physical_device:GPU:0"
+  ],
+  "split_seed": 2024,
+  "model_seed": 2024,
+  "deterministic": true,
+  "train_count": 38118,
+  "validation_count": 38583,
+  "test_count": 679961,
+  "original_labeled_centers": 954893,
+  "excluded_labeled_centers": 198231,
+  "train_class_support": {
+    "1": 11252,
+    "2": 6851,
+    "3": 25,
+    "4": 286,
+    "5": 13573,
+    "6": 6131
+  },
+  "validation_class_support": {
+    "1": 11476,
+    "2": 5986,
+    "3": 396,
+    "4": 387,
+    "5": 12917,
+    "6": 7421
+  },
+  "test_class_support": {
+    "1": 195122,
+    "2": 133370,
+    "3": 11855,
+    "4": 7769,
+    "5": 134649,
+    "6": 197196
+  },
+  "OA": 85.0337004622324,
+  "AA": 74.2443931980664,
+  "Kappa": 80.06723689370986,
+  "training_seconds": 1219.4281735420227,
+  "test_prediction_seconds": 156.33741450309753,
+  "parameters": 54222,
+  "analytical_matrix_macs": {
+    "sequence_length": 144,
+    "mac_breakdown": {
+      "token_projections": 138240,
+      "gate_spline": 16384,
+      "gate_base": 2048,
+      "attention_qkv_spline": 7077888,
+      "attention_qkv_base": 0,
+      "attention_scores": 1327104,
+      "attention_value_mix": 1327104,
+      "attention_output_projection": 294912,
+      "recurrent_transition": 589824,
+      "recurrent_input": 589824,
+      "classifier": 384
+    },
+    "macs_per_patch": 11363712,
+    "mac_equivalent_flops_per_patch": 22727424,
+    "mac_equivalent_gflops_per_patch": 0.022727424,
+    "method": "Analytical, 1 multiply-accumulate = 2 FLOPs, per patch; weights shared across 2 executed attention calls",
+    "includes": "Dense/SplineLinear/QKV/attention score/value matrix products; recurrent matrices at all N time steps",
+    "excludes": "RBF exp/basis arithmetic, LayerNorm, softmax, sigmoid/swish, biases, gating/additions; NOT total FLOPs",
+    "safe_to_claim_exact_total_flops": false
+  },
+  "flops_profile": {
+    "graph_profiled_flops_per_patch": 23328132,
+    "graph_profiled_gflops_per_patch": 0.023328132,
+    "input_shape": [
+      1,
+      12,
+      12,
+      15
+    ],
+    "method": "tf.compat.v1.profiler float_operation, frozen inference graph, batch=1",
+    "contains_control_flow": false,
+    "limitations": "Control-flow bodies may be undercounted; graph profiling also omits some non-MAC operations. Do not cite as exact FLOPs.",
+    "safe_to_claim_exact_flops": false
+  },
+  "max_epochs": 50,
+  "actual_epochs": 50,
+  "best_validation_epoch": 28,
+  "train_ratio_input": 0.5,
+  "validation_ratio_input": 0.5,
+  "test_ratio_input": 0.9,
+  "block_size": 32,
+  "buffer": 0,
+  "pca_bands": 15,
+  "pca_method": "PCA",
+  "batch_size": 56,
+  "learning_rate": 0.001,
+  "class_performance_pct": [
+    93.85563903609024,
+    79.81555072355103,
+    2.5305778152678196,
+    99.29205817994594,
+    87.26243789408016,
+    82.71009553946328
+  ],
+  "source_version_note": "Original DiMA fixed-parameter affine recurrence (unchanged), with corrected token alignment; NOT selective Mamba or GRU",
+  "target_token_flat_index": 78,
+  "architecture_version": "original_dima_affine_correct_token_alignment",
+  "token_order": "row-major H*W, original spectral bands remain contiguous"
+}

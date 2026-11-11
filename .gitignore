@@ -27,4 +27,10 @@ revision/qa/
 revision/*.log
 !/revision/reference/models/
 !/revision/reference/models/*.py
+reviwer_results_disjoint/*
+reviwer_results_disjoint.zip
+baseline_32_8_56/*
+/KanMamba_8_chnal_32_bs_56/
+/KanMamba_8_chnal_32_bs_56_buffer_32/
+/baseline_32_8_56/
 
