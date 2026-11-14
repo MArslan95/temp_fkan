@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# FKANMamba Reviewer 2 — SpikeSST-style greedy-block disjoint sampling.
-# Calls the existing --split_protocol disjoint in main.py.
-# No architecture changes; this is NOT the old strict three-way block splitter.
+# FKANMamba — original greedy-block disjoint protocol.
+# No diagnostic/paper seed restrictions. Use SEEDS and MODEL_SEED to override.
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -10,21 +9,21 @@ export MPLBACKEND=Agg
 export TF_FORCE_GPU_ALLOW_GROWTH=true
 export PYTHONUNBUFFERED=1
 
-datasets=(HC)
+PYTHON_SCRIPT="${PYTHON_SCRIPT:-main.py}"
+GPU_IDS="${GPU_IDS:-0}"
+EPOCHS="${EPOCHS:-50}"
+BLOCK_SIZE="${BLOCK_SIZE:-16}"
+PREDICTION_MAP="${PREDICTION_MAP:-test}"
+RUN_MODE="${RUN_MODE:-train}"     # split_only, train Check partition before training.
+
+datasets=(HC) # PI QUH TH HH
 window_sizes=(12)
-seeds=(42 123 2024 3407 777)
+seeds=(42) # Spatial split seeds (override: SEEDS="42 123 2024")
 if [[ -n "${SEEDS:-}" ]]; then read -r -a seeds <<< "$SEEDS"; fi
 
 dl_method=PCA
 number_of_bands=15
 batch_size=56
-
-PYTHON_SCRIPT="${PYTHON_SCRIPT:-main.py}"
-GPU_IDS="${GPU_IDS:-0}"
-EPOCHS="${EPOCHS:-5}"
-BLOCK_SIZE="${BLOCK_SIZE:-32}"
-PREDICTION_MAP="${PREDICTION_MAP:-test}"
-RUN_MODE="${RUN_MODE:-split_only}"
 
 case "$RUN_MODE" in
   train) flags=(--deterministic --prediction_map "$PREDICTION_MAP") ;;
@@ -34,38 +33,102 @@ esac
 
 [[ -f "$PYTHON_SCRIPT" ]] || { echo "Missing Python script: $PYTHON_SCRIPT" >&2; exit 2; }
 [[ -d ./hsi_datasets ]] || { echo 'Missing ./hsi_datasets directory' >&2; exit 2; }
-[[ "$BLOCK_SIZE" =~ ^[1-9][0-9]*$ ]] || {
-  echo 'BLOCK_SIZE must be a positive integer' >&2; exit 2;
-}
 
 mkdir -p logs
 for dataset in "${datasets[@]}"; do
   for window_size in "${window_sizes[@]}"; do
-    for seed in "${seeds[@]}"; do
+    for split_seed in "${seeds[@]}"; do
+      model_seed="${MODEL_SEED:-$split_seed}"
       stamp="$(date +%Y%m%d_%H%M%S)"
-      log="logs/${dataset}_spikesst_disjoint_ws${window_size}_seed${seed}_${stamp}.log"
-      echo "Protocol=SpikeSST-style disjoint Dataset=$dataset WS=$window_size seed=$seed block=$BLOCK_SIZE GPU=$GPU_IDS mode=$RUN_MODE"
-      if PYTHONHASHSEED="$seed" CUDA_VISIBLE_DEVICES="$GPU_IDS" \
+      log="logs/${dataset}_disjoint_ws${window_size}_split${split_seed}_model${model_seed}_${stamp}.log"
+      echo "Dataset=$dataset WS=$window_size split_seed=$split_seed model_seed=$model_seed block=$BLOCK_SIZE GPU=$GPU_IDS run=$RUN_MODE Python=$PYTHON_SCRIPT"
+      if PYTHONHASHSEED="$model_seed" CUDA_VISIBLE_DEVICES="$GPU_IDS" \
          python -u "$PYTHON_SCRIPT" \
            --dataset "$dataset" --window_size "$window_size" \
            --dl_method "$dl_method" --number_of_bands "$number_of_bands" \
            --batch_size "$batch_size" --epochs "$EPOCHS" \
-           --seed "$seed" --split_seed "$seed" \
+           --seed "$model_seed" --split_seed "$split_seed" \
            --split_protocol disjoint --block_size "$BLOCK_SIZE" \
            --train_ratio 0.50 --validation_ratio 0.50 --test_ratio 0.90 \
            --spatial_buffer 0 \
            "${flags[@]}" 2>&1 | tee "$log"; then
-        echo "SUCCESS: $dataset seed=$seed; log=$log"
+        echo "SUCCESS: split_seed=$split_seed model_seed=$model_seed; log=$log"
       else
         rc=$?
-        echo "FAILED (exit $rc): $dataset seed=$seed; see $log" >&2
+        echo "FAILED (exit $rc): split_seed=$split_seed model_seed=$model_seed; log=$log" >&2
         exit "$rc"
       fi
     done
   done
 done
+echo 'Completed FKANMamba experiment.'
 
-echo 'Completed requested HC  disjoint experiments.'
+#!/usr/bin/env bash
+# # FKANMamba Reviewer 2 — SpikeSST-style greedy-block disjoint sampling.
+# # Calls the existing --split_protocol disjoint in main.py.
+# # No architecture changes; this is NOT the old strict three-way block splitter.
+# set -Eeuo pipefail
+# cd "$(dirname "${BASH_SOURCE[0]}")"
+
+# export QT_QPA_PLATFORM=offscreen
+# export MPLBACKEND=Agg
+# export TF_FORCE_GPU_ALLOW_GROWTH=true
+# export PYTHONUNBUFFERED=1
+
+# datasets=(HC) #PI QUH TH HH
+# window_sizes=(12)
+# seeds=(123) # 42 123 2024 3407 777
+# if [[ -n "${SEEDS:-}" ]]; then read -r -a seeds <<< "$SEEDS"; fi
+# dl_method=PCA
+# number_of_bands=15
+# batch_size=56
+
+# PYTHON_SCRIPT="${PYTHON_SCRIPT:-main.py}"
+# GPU_IDS="${GPU_IDS:-0}"
+# EPOCHS="${EPOCHS:-50}"
+# BLOCK_SIZE="${BLOCK_SIZE:-32}"
+# PREDICTION_MAP="${PREDICTION_MAP:-test}"
+# RUN_MODE="${RUN_MODE:-train}"     # Check partition before training.
+
+# case "$RUN_MODE" in
+#   train) flags=(--deterministic --prediction_map "$PREDICTION_MAP") ;;
+#   split_only) flags=(--verify_split_only) ;;
+#   *) echo 'RUN_MODE must be train or split_only' >&2; exit 2 ;;
+# esac
+
+# [[ -f "$PYTHON_SCRIPT" ]] || { echo "Missing Python script: $PYTHON_SCRIPT" >&2; exit 2; }
+# [[ -d ./hsi_datasets ]] || { echo 'Missing ./hsi_datasets directory' >&2; exit 2; }
+# [[ "$BLOCK_SIZE" =~ ^[1-9][0-9]*$ ]] || {
+#   echo 'BLOCK_SIZE must be a positive integer' >&2; exit 2;
+# }
+
+# mkdir -p logs
+# for dataset in "${datasets[@]}"; do
+#   for window_size in "${window_sizes[@]}"; do
+#     for seed in "${seeds[@]}"; do
+#       stamp="$(date +%Y%m%d_%H%M%S)"
+#       log="logs/${dataset}_disjoint_ws${window_size}_seed${seed}_${stamp}.log"
+#       echo "Protocol=Disjoint Dataset=$dataset WS=$window_size seed=$seed block=$BLOCK_SIZE GPU=$GPU_IDS mode=$RUN_MODE"
+#       if PYTHONHASHSEED="$seed" CUDA_VISIBLE_DEVICES="$GPU_IDS" \
+#          python -u "$PYTHON_SCRIPT" \
+#            --dataset "$dataset" --window_size "$window_size" \
+#            --dl_method "$dl_method" --number_of_bands "$number_of_bands" \
+#            --batch_size "$batch_size" --epochs "$EPOCHS" \
+#            --seed "$seed" --split_seed "$seed" \
+#            --split_protocol disjoint --block_size "$BLOCK_SIZE" \
+#            --train_ratio 0.50 --validation_ratio 0.50 --test_ratio 0.90 \
+#            --spatial_buffer 0 \
+#            "${flags[@]}" 2>&1 | tee "$log"; then
+#         echo "SUCCESS: $dataset seed=$seed; log=$log"
+#       else
+#         rc=$?
+#         echo "FAILED (exit $rc): $dataset seed=$seed; see $log" >&2
+#         exit "$rc"
+#       fi
+#     done
+#   done
+# done
+# echo 'Completed requested HC  disjoint experiments.'
 
 
 
@@ -205,105 +268,3 @@ echo 'Completed requested HC  disjoint experiments.'
 #         --seed "$seed" --split_seed "$seed" "${flags[@]}" 2>&1 | tee "$logfile"
 #   done
 # done
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#!/usr/bin/env bash
-# # Spatially disjoint FKAN experiment launcher (for the seeded main file).
-# set -Eeuo pipefail
-
-# # main.py loads ./hsi_datasets relative to the current working directory.
-# cd "$(dirname "${BASH_SOURCE[0]}")"
-
-# export QT_QPA_PLATFORM=offscreen
-# export MPLBACKEND=Agg
-# export TF_FORCE_GPU_ALLOW_GROWTH=true
-# export PYTHONUNBUFFERED=1
-
-# PYTHON_SCRIPT="${PYTHON_SCRIPT:-main.py}"
-# GPU_IDS="${GPU_IDS:-1}"                 # One GPU; two visible GPUs != distributed training.
-# datasets=("PI" "TH")                        # HC is supported by the supplied dataset loader.
-# window_sizes=(12)
-# seeds=(123 345 2024)                             # Pilot; later: (42 123 345 2024 2026)
-
-# dl_method="PCA"
-# train_ratio=0.50                       # Conditional share of non-test samples
-# validation_ratio=0.50                  # Conditional share of non-test samples
-# test_ratio=0.90                        # Effective targets: 5%, 5%, 90%
-# number_of_bands=15
-# block_size=32
-# spatial_buffer=0
-# search_trials=512
-# batch_size=56
-# epochs=50                               # Pilot; set to 50 for full experiments (no early stopping)
-
-# # Test-only classification maps reuse the already computed test predictions.
-# PREDICTION_MAP="${PREDICTION_MAP:-test}"
-# # Use RUN_MODE=split_only to verify splitting before model training.
-# RUN_MODE="${RUN_MODE:-train}"
-# case "$RUN_MODE" in
-#     train) extra_flags=(--prediction_map "$PREDICTION_MAP" --deterministic) ;;
-#     split_only) extra_flags=(--verify_split_only) ;;
-#     *) echo "Invalid RUN_MODE=$RUN_MODE; use train or split_only" >&2; exit 2 ;;
-# esac
-
-# if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-#     echo "Missing $PYTHON_SCRIPT in $(pwd). Set PYTHON_SCRIPT=main.py or put main.py here." >&2
-#     exit 2
-# fi
-
-# LOG_DIR="logs"
-# mkdir -p "$LOG_DIR"
-
-# for dataset in "${datasets[@]}"; do
-#     for window_size in "${window_sizes[@]}"; do
-#         for seed in "${seeds[@]}"; do
-#             stamp="$(date +%Y%m%d_%H%M%S)"
-#             LOG_FILE="$LOG_DIR/${dataset}_ws${window_size}_seed${seed}_${stamp}.log"
-#             echo "Dataset=$dataset WS=$window_size split_seed=$seed model_seed=$seed GPU=$GPU_IDS mode=$RUN_MODE"
-#             echo "Logging to $LOG_FILE"
-
-#             # Pipeline exit status is propagated by 'set -o pipefail'.
-#             if PYTHONHASHSEED="$seed" CUDA_VISIBLE_DEVICES="$GPU_IDS" \
-#                 python -u "$PYTHON_SCRIPT" \
-#                     --dataset "$dataset" \
-#                     --window_size "$window_size" \
-#                     --dl_method "$dl_method" \
-#                     --train_ratio "$train_ratio" \
-#                     --validation_ratio "$validation_ratio" \
-#                     --test_ratio "$test_ratio" \
-#                     --number_of_bands "$number_of_bands" \
-#                     --block_size "$block_size" \
-#                     --spatial_buffer "$spatial_buffer" \
-#                     --search_trials "$search_trials" \
-#                     --batch_size "$batch_size" \
-#                     --epochs "$epochs" \
-#                     --seed "$seed" \
-#                     --split_seed "$seed" \
-#                     "${extra_flags[@]}" 2>&1 | tee "$LOG_FILE"; then
-#                 echo "SUCCESS: $dataset WS=$window_size seed=$seed"
-#             else
-#                 rc=$?
-#                 echo "FAILED (exit $rc): $dataset WS=$window_size seed=$seed. Inspect $LOG_FILE" >&2
-#                 exit "$rc"
-#             fi
-#         done
-#     done
-# done
-
-# echo "All requested experiments completed successfully. Logs: $LOG_DIR"
-
-
-
