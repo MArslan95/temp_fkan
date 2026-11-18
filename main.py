@@ -44,11 +44,11 @@ adam = tf.keras.optimizers.legacy.Adam(learning_rate=0.001, decay=1e-06)
 # print(tf.config.list_physical_devices('GPU'))
 # exit(0)
 # ============================================================================
-# SPATIALLY DISJOINT TRAIN / VALIDATION / TEST (INTEGRATED — NO EXTRA MODULE)
-# Ratio convention: train=.50 and val=.50 split the remaining 10% after test=.90.
-# Target = 5% train / 5% val / 90% test (actual retained ratios can vary).
-# In disjoint=greedy mode, train/val may overlap each other; held-out test patches
-# share zero source pixels with either subset (the exact minimal exclusion).
+# ONE PROTOCOL: greedy block allocation for train/validation, exact reflect-aware
+# patch-source exclusion for held-out testing. No extra block exclusion or buffer.
+# The 5%/5%/90% ratios are targets, not guaranteed after patch-source exclusion.
+# Train and validation patches may overlap; TEST patches share zero source pixels
+# with either training or validation. This is NOT three-way independence.
 # ============================================================================
 
 def _window_bounds(window_size, buffer=0):
@@ -58,24 +58,6 @@ def _window_bounds(window_size, buffer=0):
     before = window_size // 2 + buffer
     after = window_size - 1 - window_size // 2 + buffer
     return before, after
-
-
-def _contained_footprints(owner_map, subset_id, window_size, buffer):
-    """Return centers whose *entire* patch + safety buffer belongs to subset_id."""
-    height, width = owner_map.shape
-    before, after = _window_bounds(window_size, buffer)
-    side = before + after + 1
-    result = np.zeros((height, width), dtype=bool)
-    if height < side or width < side:
-        return result
-
-    binary = (owner_map == subset_id).astype(np.int32)
-    integral = np.pad(binary, ((1, 0), (1, 0)), mode="constant")
-    integral = integral.cumsum(axis=0, dtype=np.int64).cumsum(axis=1, dtype=np.int64)
-    sums = (integral[side:, side:] - integral[:-side, side:]
-            - integral[side:, :-side] + integral[:-side, :-side])
-    result[before:height - after, before:width - after] = sums == side * side
-    return result
 
 
 def resolve_split_ratios(train_ratio, validation_ratio, test_ratio):
@@ -97,202 +79,6 @@ def resolve_split_ratios(train_ratio, validation_ratio, test_ratio):
     raise ValueError("Ratios must either sum to 1 (absolute fractions), or "
                      "train_ratio + validation_ratio must equal 1 "
                      "(fractions of the non-test portion)")
-
-
-def _core_tile_histogram(gt, active, tile_of_labeled, classes_compact,
-                         block_size, window_size, buffer, num_tiles,
-                         num_classes):
-    """Conservative class counts always retained if a tile owns its interior."""
-    height, width = gt.shape
-    before, after = _window_bounds(window_size, buffer)
-    r, c = active[:, 0], active[:, 1]
-    tile_r, tile_c = r // block_size, c // block_size
-    r0, c0 = tile_r * block_size, tile_c * block_size
-    r1 = np.minimum(r0 + block_size, height)
-    c1 = np.minimum(c0 + block_size, width)
-    eligible = ((r - r0 >= before) & (c - c0 >= before) &
-                (r + after < r1) & (c + after < c1))
-    hist = np.zeros((num_tiles, num_classes), dtype=np.int64)
-    np.add.at(hist, (tile_of_labeled[eligible], classes_compact[eligible]), 1)
-    return hist
-
-
-def _guided_owners(rng, core_hist, ratio):
-    """Prioritize class coverage in train then val before filling the test set."""
-    num_tiles, num_classes = core_hist.shape
-    owners = np.full(num_tiles, 2, dtype=np.int8)
-    core_count = core_hist.sum(axis=1)
-    available = core_count > 0
-    rarity = 1.0 / np.maximum(1, np.count_nonzero(core_hist > 0, axis=0))
-    # Cover training classes first, then validation classes if possible.
-    for group in (0, 1):
-        missing = np.any(core_hist > 0, axis=0)
-        while missing.any() and available.any():
-            gains = (core_hist[:, missing] > 0) @ rarity[missing]
-            gain_score = gains / np.maximum(core_count, 1)**0.25
-            gain_score *= rng.uniform(0.90, 1.10, size=num_tiles)
-            gain_score[~available] = -1
-            chosen = int(np.argmax(gain_score))
-            if gains[chosen] <= 0:
-                break
-            owners[chosen] = group
-            available[chosen] = False
-            missing &= core_hist[chosen] == 0
-    # Complete the small train/validation quotas without splitting a tile.
-    global_total = int(core_count.sum())
-    for group in (0, 1):
-        target = ratio[group] * global_total
-        have = int(core_count[owners == group].sum())
-        while have < target and available.any():
-            candidates = np.flatnonzero(available)
-            cost = np.abs(have + core_count[candidates] - target)
-            cost = cost + rng.uniform(0, 0.02, size=len(cost)) * np.maximum(1, target)
-            idx = int(candidates[np.argmin(cost)])
-            # Do not add a block that moves us farther away than doing nothing.
-            if abs(have + core_count[idx] - target) >= abs(have - target):
-                break
-            owners[idx] = group
-            available[idx] = False
-            have += core_count[idx]
-    return owners
-
-
-def disjoint_spatial_split(
-    gt, window_size, train_ratio=0.70, validation_ratio=0.10,
-    test_ratio=0.20, block_size=32, buffer=0, seed=345,
-    search_trials=512,
-):
-    """Partition labeled HSI centers so train/val/test patches share ZERO pixels.
-
-    Ratios may be absolute (sum to 1) or legacy conditional
-    train/validation fractions of the non-test portion. They are targets,
-    not guarantees, after block quantization and spatial boundary erosion.
-    Returns (train_coords, val_coords, test_coords, split_map, owner_map).
-    """
-    gt = np.asarray(gt)
-    if gt.ndim != 2 or not np.issubdtype(gt.dtype, np.integer):
-        raise ValueError("gt must be a 2-D array of integer class IDs (0=unlabeled)")
-    if np.any(gt < 0):
-        raise ValueError("gt must contain only nonnegative class IDs")
-    ratios = resolve_split_ratios(train_ratio, validation_ratio, test_ratio)
-    if not isinstance(block_size, (int, np.integer)) or block_size < window_size + 2 * buffer:
-        raise ValueError("block_size must be an integer >= window_size + 2 * buffer")
-    if search_trials < 1:
-        raise ValueError("search_trials must be >= 1")
-
-    height, width = gt.shape
-    rows = (height + block_size - 1) // block_size
-    cols = (width + block_size - 1) // block_size
-    num_tiles = rows * cols
-    active = np.argwhere(gt > 0)
-    if len(active) == 0:
-        raise ValueError("gt has no labeled pixels")
-    tile_of_labeled = ((active[:, 0] // block_size) * cols
-                       + (active[:, 1] // block_size))
-    class_labels = np.unique(gt[gt > 0])
-    classes_compact = np.searchsorted(class_labels, gt[active[:, 0], active[:, 1]])
-    hist = np.zeros((num_tiles, len(class_labels)), dtype=np.int64)
-    np.add.at(hist, (tile_of_labeled, classes_compact), 1)
-    active_tiles = np.flatnonzero(hist.sum(axis=1))
-    if len(active_tiles) < 3:
-        raise ValueError(f"Only {len(active_tiles)} labeled spatial blocks: need >= 3. "
-                         "Decrease --block_size if the scene has enough spatial extent")
-    core_hist = _core_tile_histogram(gt, active, tile_of_labeled,
-                                     classes_compact, block_size, window_size,
-                                     buffer, num_tiles, len(class_labels))
-    if not np.any(core_hist):
-        raise ValueError("No labeled pixels survive inside individual spatial blocks. "
-                         "Reduce window size/buffer or adjust block_size")
-    # Candidate generation uses core-tile counts (guaranteed retained pixels).
-    # Final selection rescans actual post-erosion footprints, not raw tile counts.
-    rng = np.random.default_rng(seed)
-    core_totals = core_hist.sum(axis=0)
-    all_total = int(core_totals.sum())
-    potential = np.count_nonzero(core_hist > 0, axis=0) >= 3
-    # Small owner regions lose a larger fraction of centers to erosion than
-    # the much larger contiguous test region. Explore several OVER-ALLOCATIONS
-    # of blocks to small splits, then choose on exact post-erosion ratios.
-    scales = (1.0, 1.25, 1.5, 1.75, 2.0, 2.25) if ratios[2] >= .65 else (1.0,)
-    candidates_by_scale = [[] for _ in scales]
-    for trial in range(search_trials):
-        scale_id = trial % len(scales)
-        scale = scales[scale_id]
-        proposal = ratios.copy()
-        proposal[:2] *= scale
-        proposal[2] = 1.0 - proposal[0] - proposal[1]
-        if proposal[2] <= 0:
-            continue
-        if trial % 4 != 0:
-            owners = _guided_owners(rng, core_hist, proposal)
-        else:
-            owners = rng.choice(3, size=num_tiles, p=proposal).astype(np.int8)
-        counts = np.stack([core_hist[owners == j].sum(axis=0) for j in range(3)])
-        totals = counts.sum(axis=1)
-        if (totals == 0).any():
-            continue
-        actual = totals / totals.sum()
-        per_cls = counts / np.maximum(1, core_totals)[None, :]
-        score = (60.0 * np.sum((actual - proposal)**2)
-                 + 0.5 * np.mean((per_cls - proposal[:, None])**2)
-                 + 1_000.0 * np.sum(counts[0, core_totals > 0] == 0)
-                 + 0.2 * np.sum(counts[1:, potential] == 0))
-        candidates_by_scale[scale_id].append((float(score), owners))
-    candidates = []
-    for bucket in candidates_by_scale:
-        bucket.sort(key=lambda item: item[0])
-        candidates.extend(bucket[:8])
-    if not candidates:
-        raise ValueError("Unable to allocate three nonempty spatial partitions; "
-                         "try a smaller block size or different seed")
-    # Score finalists on *eligible centers* after eroding partition boundaries.
-    tile_ids = ((np.arange(height)[:, None] // block_size) * cols
-                + np.arange(width)[None, :] // block_size)
-    best = None
-    best_score = np.inf
-    for _proxy_score, owners in candidates:
-        owner_map = owners[tile_ids]
-        masks = []
-        counts = []
-        for subset_id in range(3):
-            mask = _contained_footprints(owner_map, subset_id, window_size, buffer)
-            mask &= gt > 0
-            masks.append(mask)
-            counts.append(np.bincount(np.searchsorted(class_labels, gt[mask]),
-                                      minlength=len(class_labels)))
-        totals = np.array([c.sum() for c in counts])
-        if (totals == 0).any() or np.any(counts[0] == 0):
-            continue
-        kept_ratios = totals / totals.sum()
-        class_props = np.stack(counts) / np.maximum(1, np.stack(counts).sum(axis=0))[None, :]
-        score = (60.0 * np.sum((kept_ratios - ratios)**2)
-                 + np.mean((class_props - ratios[:, None])**2)
-                 + 0.2 * np.sum(np.stack(counts)[1:, potential] == 0))
-        if score < best_score:
-            best_score = score
-            best = (owner_map.copy(), masks)
-    if best is None:
-        raise ValueError(
-            "No candidate retained all GT classes in training with nonempty validation "
-            "and test regions AFTER spatial erosion. For a 5/5/90 split, rare classes "
-            "may require >5% training. Reduce --block_size or --spatial_buffer, "
-            "increase --search_trials, or try another --split_seed. "
-            "Do not silently drop training classes."
-        )
-    owner_map, masks = best
-    split_map = np.zeros((height, width), dtype=np.uint8)
-    coords = []
-    for i, mask in enumerate(masks):
-        split_map[mask] = i + 1
-        coords.append(np.argwhere(mask).astype(np.int32))
-    for name, part in [("validation", coords[1]), ("testing", coords[2])]:
-        present = np.unique(gt[part[:, 0], part[:, 1]])
-        missing = np.setdiff1d(class_labels, present)
-        if len(missing):
-            warnings.warn(f"{name} partition has no pixels for classes "
-                          f"{missing.tolist()}; class-specific evaluation is undefined",
-                          stacklevel=2)
-    verify_disjoint_footprints(coords, gt.shape, window_size, owner_map)
-    return (*coords, split_map, owner_map)
 
 
 def reflected_patch_overlap_mask(center_mask, window_size):
@@ -351,8 +137,7 @@ def reflected_patch_overlap_mask(center_mask, window_size):
 def disjoint_split_coords(gt, train_ratio, val_ratio, seed, window_size, block=32):
     """Greedy classwise spatial split with the EXACT minimum patch nonoverlap.
 
-    Maintains the source greedy block train/validation allocation and fixed
-    per-class training/validation counts. A held-out test center is eligible
+    Maintains greedy block train/validation allocation and per-class quota targets. A held-out test center is eligible
     only if its reflect-padded WS x WS input footprint shares zero ORIGINAL
     source pixels with ANY train or validation footprint. In the image interior,
     the minimum forbidden Chebyshev radius is WS-1; near edges exact reflected
@@ -407,9 +192,12 @@ def disjoint_split_coords(gt, train_ratio, val_ratio, seed, window_size, block=3
         rng.shuffle(coords)
         n_take = min(target[c], len(coords))
         take = coords[:n_take]
-        n_tr = max(int(round(n_take * train_ratio / (train_ratio + val_ratio))), 1)
+        # Never reuse the same labeled center in both train and validation.
+        # With one available pixel, assign it to train, leaving this class absent
+        # from validation rather than silently duplicating that pixel.
+        n_tr = min(n_take, max(int(round(n_take * train_ratio / (train_ratio + val_ratio))), 1))
         train.append(take[:n_tr])
-        val.append(take[n_tr:] if n_take > n_tr else take[:1])
+        val.append(take[n_tr:])
         selected_mask[take[:, 0], take[:, 1]] = True
 
     # The ORIGINAL extraction uses reflect padding. Exact reflected source-
@@ -423,218 +211,6 @@ def disjoint_split_coords(gt, train_ratio, val_ratio, seed, window_size, block=3
     if missing:
         print(f'  [disjoint split] WARNING: classes with no test pixels: {missing}')
     return np.concatenate(train), np.concatenate(val), test
-
-
-def _grow_one_connected_region(eligible, requested, rng):
-    """Select one 8-connected region (no random-pixel fallback).
-
-    Selects a random sufficiently large connected component when possible.
-    If none is large enough, propose the largest component; the calling
-    splitter REJECTS the candidate unless the FULL quota is attained.
-    Never silently scatter noncontiguous training pixels.
-    """
-    from collections import deque
-    from scipy import ndimage
-    eligible = np.asarray(eligible, dtype=bool)
-    labeled, number = ndimage.label(eligible, structure=np.ones((3, 3), dtype=np.uint8))
-    if not number:
-        return np.empty((0, 2), dtype=np.int32)
-    sizes = np.bincount(labeled.ravel(), minlength=number + 1)
-    sizes[0] = 0
-    full = np.flatnonzero(sizes >= requested)
-    choices = full if len(full) else np.flatnonzero(sizes == sizes.max())
-    component = int(rng.choice(choices))
-    rr, cc = np.nonzero(labeled == component)
-    seed_ix = int(rng.integers(len(rr)))
-    seed = (int(rr[seed_ix]), int(cc[seed_ix]))
-    queue = deque([seed])
-    visited = np.zeros(eligible.shape, dtype=bool)
-    visited[seed] = True
-    selected = []
-    neighbors = ((-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1))
-    height, width = eligible.shape
-    count = min(int(requested), int(sizes[component]))
-    while queue and len(selected) < count:
-        r, c = queue.popleft()
-        selected.append((r,c))
-        for k in rng.permutation(8):
-            dr, dc = neighbors[int(k)]
-            nr, nc = r + dr, c + dc
-            if (0 <= nr < height and 0 <= nc < width and not visited[nr,nc]
-                    and labeled[nr,nc] == component):
-                visited[nr,nc] = True
-                queue.append((nr,nc))
-    return np.asarray(selected, dtype=np.int32).reshape(-1, 2)
-
-
-def github_connected_disjoint_split(gt, window_size, buffer=0, seed=42,
-                                   search_trials=128, train_pixels=None,
-                                   validation_pixels=None, min_test_per_class=1):
-    """Class-wise connected train/validation; strict patch-safe held-out remainder.
-
-    Github quota convention: minimum GT class count // 10 training centers per
-    class; validation centers = training quota // 5. Overrides can be set before
-    experiments. Search uses GT/spatial geometry ONLY, never model/test scores.
-
-    All labeled pixels enter the allocation/eligibility audit. Some cannot be
-    used as centers because their full WS x WS input patches would overlap a
-    different subset; excluded centers are counted explicitly. If any GT class
-    is absent in train/validation/test, no split is accepted.
-    """
-    gt = np.asarray(gt)
-    if gt.ndim != 2 or not np.issubdtype(gt.dtype, np.integer) or np.any(gt < 0):
-        raise ValueError('GT must be a 2D image of nonnegative integer labels')
-    if window_size < 1 or buffer < 0 or search_trials < 1 or min_test_per_class < 1:
-        raise ValueError('window_size/search_trials/min_test_per_class >= 1; buffer >= 0')
-    classes, class_counts = np.unique(gt[gt > 0], return_counts=True)
-    if len(classes) < 2:
-        raise ValueError('Need >= 2 labeled classes for HSI classification')
-    smallest = int(class_counts.min())
-    ntrain = int(train_pixels) if train_pixels is not None else smallest // 10
-    nval = int(validation_pixels) if validation_pixels is not None else ntrain // 5
-    if ntrain < 1 or nval < 1:
-        raise ValueError('The GitHub minimum-class quota is zero; supply '
-                         '--connected_train_pixels and --connected_validation_pixels')
-    if np.any(class_counts <= ntrain + nval + min_test_per_class - 1):
-        raise ValueError('Per-class quotas leave no possible held-out sample. '
-                         f'GT class counts={dict(zip(classes.tolist(), class_counts.tolist()))}; '
-                         f'train quota={ntrain}, val quota={nval}, '
-                         f'min test={min_test_per_class}')
-    height, width = gt.shape
-    before, after = _window_bounds(window_size)
-    valid_edge = np.zeros(gt.shape, dtype=bool)
-    valid_edge[before:height-after, before:width-after] = True
-    if not valid_edge.any():
-        raise ValueError('Window is too large for scene')
-    rng = np.random.default_rng(seed)
-    best = None
-    best_retained = -1
-    near_misses = []
-    for trial in range(search_trials):
-        # Select exactly one connected train region for EACH class.
-        train_parts = []
-        for cls in classes:
-            part = _grow_one_connected_region((gt == cls) & valid_edge, ntrain, rng)
-            train_parts.append(part)
-        # An 8-connected region is required to contain the FULL predeclared
-        # per-class quota. Never silently train with fewer samples per class.
-        if any(len(p) != ntrain for p in train_parts):
-            continue
-        train = np.concatenate(train_parts)
-        train_coverage = footprint_coverage(train, gt.shape, window_size)
-
-        # Validation centers must be far enough from TRAIN'S ENTIRE input
-        # footprint that their OWN complete patches cannot share any pixels.
-        val_owner = np.ones(gt.shape, dtype=np.uint8)
-        val_owner[train_coverage] = 0
-        val_eligible = _contained_footprints(val_owner, 1, window_size, buffer)
-        val_parts = []
-        for cls in classes:
-            part = _grow_one_connected_region((gt == cls) & val_eligible, nval, rng)
-            val_parts.append(part)
-        if any(len(p) != nval for p in val_parts):
-            continue
-        validation = np.concatenate(val_parts)
-        validation_coverage = footprint_coverage(validation, gt.shape, window_size)
-        if np.any(train_coverage & validation_coverage):
-            raise AssertionError('Validation input pixels overlap training inputs')
-
-        # Input-pixel owner map: 0=train source pixels, 1=validation, 2=test.
-        # Unlike a block partition, ownership is determined by real footprints.
-        owner = np.full(gt.shape, 2, dtype=np.uint8)
-        owner[train_coverage] = 0
-        owner[validation_coverage] = 1
-        test_mask = _contained_footprints(owner, 2, window_size, buffer)
-        test_mask &= gt > 0
-        test = np.argwhere(test_mask).astype(np.int32)
-        train_support = np.array([np.count_nonzero(gt[train[:,0],train[:,1]] == cls)
-                                  for cls in classes])
-        val_support = np.array([np.count_nonzero(gt[validation[:,0],validation[:,1]] == cls)
-                                for cls in classes])
-        test_support = np.array([np.count_nonzero(gt[test[:,0],test[:,1]] == cls)
-                                 for cls in classes]) if len(test) else np.zeros(len(classes), dtype=int)
-        missing = classes[(train_support == 0) | (val_support == 0) |
-                          (test_support < min_test_per_class)]
-        if len(missing):
-            near_misses.append((len(missing), missing.tolist(), test_support.tolist()))
-            continue
-        # Exact connected quotas are hard constraints, not merely targets.
-        # Use class support as hard constraints, and retained labeled centers as
-        # geometry-only search objective; NEVER score a candidate by model OA.
-        retained = len(train) + len(validation) + len(test)
-        if retained > best_retained:
-            best_retained = retained
-            best = (train, validation, test, owner, trial, train_support,
-                    val_support, test_support)
-    if best is None:
-        near_misses.sort(key=lambda item: item[0])
-        closest = near_misses[:2]
-        raise ValueError(
-            f'No patch-safe connected-region split covering every class in all three '
-            f'subsets after {search_trials} geometric trials (WS={window_size}, '
-            f'buffer={buffer}, train/class={ntrain}, val/class={nval}). '
-            f'Closest missing test/val classes and support: {closest}. '
-            'Try predefined smaller training/validation quotas, or another '
-            'spatial protocol; never permit overlapping patches or silently '
-            'drop missing test classes.'
-        )
-    train, validation, test, owner, chosen_trial, train_support, val_support, test_support = best
-    center_map = np.zeros(gt.shape, dtype=np.uint8)
-    for subset, coords in enumerate((train, validation, test), 1):
-        center_map[coords[:,0], coords[:,1]] = subset
-    retained = len(train) + len(validation) + len(test)
-    original = int(np.count_nonzero(gt))
-    assert retained + int(np.count_nonzero((gt>0)&(center_map==0))) == original
-    if not np.all(train_support == ntrain) or not np.all(val_support == nval):
-        raise AssertionError('Exact predeclared connected class quotas not attained')
-    verify_disjoint_footprints((train, validation, test), gt.shape, window_size, owner)
-    print(f'CONNECTED CLASS REGIONS + PATCH-SAFE TEST PASS: '
-          f'all {len(classes)} classes in train/validation/test; '
-          f'chosen geometric trial={chosen_trial}; '
-          f'per-class quotas train={ntrain} val={nval}; '
-          f'retained={retained:,} excluded={original-retained:,}', flush=True)
-    return train, validation, test, center_map, owner
-
-def footprint_coverage(coords, image_shape, window_size):
-    """Fast 2-D difference-array union of all input patch source pixels."""
-    before, after = _window_bounds(window_size)
-    height, width = image_shape
-    result = np.zeros((height + 1, width + 1), dtype=np.int64)
-    if len(coords):
-        r0 = coords[:, 0] - before
-        c0 = coords[:, 1] - before
-        r1 = coords[:, 0] + after + 1
-        c1 = coords[:, 1] + after + 1
-        if (r0.min() < 0 or c0.min() < 0 or
-                r1.max() > height or c1.max() > width):
-            raise AssertionError("Some patch footprints extend beyond the original image")
-        np.add.at(result, (r0, c0), 1)
-        np.add.at(result, (r1, c0), -1)
-        np.add.at(result, (r0, c1), -1)
-        np.add.at(result, (r1, c1), 1)
-    covered = result.cumsum(axis=0).cumsum(axis=1)[:height, :width]
-    return covered > 0
-
-
-def verify_disjoint_footprints(coord_groups, image_shape, window_size, owner_map=None):
-    """Raise an AssertionError if ANY source pixel appears in multiple splits."""
-    used = np.zeros(image_shape, dtype=np.uint8)
-    counts = []
-    for i, coords in enumerate(coord_groups):
-        covered = footprint_coverage(coords, image_shape, window_size)
-        overlapping = np.count_nonzero(covered & (used != 0))
-        if overlapping:
-            raise AssertionError(
-                f"Spatial leakage: split {i} overlaps {overlapping} source pixels "
-                "from previously checked splits"
-            )
-        if owner_map is not None and np.any(owner_map[covered] != i):
-            raise AssertionError(f"Split {i} uses source pixels owned by another split")
-        used[covered] = i + 1
-        counts.append(int(np.count_nonzero(covered)))
-    print("PASS: zero shared source pixels across train, validation and test patches.")
-    print(f"Distinct source pixels covered in each subset: {counts}")
-    return True
 
 
 def reduce_pca_training_only(hsi, train_coords, n_components, method="PCA"):
@@ -1034,20 +610,14 @@ parser.add_argument(
 parser.add_argument(
     "--batch_size", "-bs", type=int, default=56, help="Batch size for training"
 )
-parser.add_argument("--block_size", type=int, default=16,
-                    help="Side length of assigned non-overlapping spatial blocks")
-parser.add_argument("--spatial_buffer", type=int, default=0,
-                    help="Extra source pixels to exclude around each partition boundary")
-parser.add_argument("--search_trials", type=int, default=512,
-                    help="Candidate trials (block or connected-region protocol)")
-parser.add_argument("--split_protocol", choices=("blocks", "connected", "disjoint"), default="blocks",
-                    help="blocks=three-way independent; connected=three-way connected; disjoint=greedy train/val pool + exact patch-safe held-out test")
-parser.add_argument("--connected_train_pixels", type=int, default=None,
-                    help="Connected protocol: exact training centers PER CLASS; default=min(GT class count)//10")
-parser.add_argument("--connected_validation_pixels", type=int, default=None,
-                    help="Connected protocol: exact validation centers PER CLASS; default=train quota//5")
-parser.add_argument("--min_test_per_class", type=int, default=1,
-                    help="Connected protocol: fail unless every class has at least this many retained test centers")
+parser.add_argument("--block_size", type=int, default=32,
+                    help="Block size used ONLY for greedy train/validation allocation")
+# Retained for compatibility with existing dff_ws.sh (which passes 0).
+# No extra buffer is applied by this protocol.
+parser.add_argument("--spatial_buffer", type=int, default=0, choices=(0,),
+                    help="Legacy compatibility only: must be 0 (no extra spatial buffer)")
+parser.add_argument("--split_protocol", choices=("disjoint",), default="disjoint",
+                    help="Only greedy disjoint sampling with exact patch-safe held-out test")
 parser.add_argument("--seed", type=int, default=345,
                     help="Run seed: random, NumPy, TensorFlow initialization and training; also split unless overridden")
 parser.add_argument("--split_seed", type=int, default=None,
@@ -1201,16 +771,10 @@ num_heads=8
 out_channels=32
 epochs = args.epochs
 batch_size = args.batch_size
-# output_dir = os.path.join(f"Spaital_Spectral_Kan_Mamba/{HSID}/window_size/{WS}")
-# Versioned output directory preserves all pre-existing baseline results.
-# split_directory = (f"split_{args.split_seed}_github_connected_patchsafe"
-#                    if args.split_protocol == "connected" else
-#                    f"split_{args.split_seed}_{args.block_size}"
-#                    if args.split_protocol == "disjoint" else f"split_{args.split_seed}")
-split_directory = (f"split_{args.split_seed}_{args.block_size}"
-                   if args.split_protocol == "disjoint" else f"split_{args.split_seed}")
+# Keep the existing output convention for split-cache compatibility.
+split_directory = f"split_{args.split_seed}"
 output_dir = os.path.join(
-    f"KanMamba_{num_heads}_chnal_{out_channels}_bs_{batch_size}",
+    f"KanMamba_{num_heads}_chnal_{out_channels}_bs_{batch_size}_blocksize_{args.block_size}",
     HSID, str(WS), "arch_original", split_directory,
     f"seed_{args.seed}")
 if not os.path.exists(output_dir):
@@ -1219,54 +783,20 @@ if not os.path.exists(output_dir):
 # %%
 # Spatially disjoint patch extraction replaces the old ImageCubes function.
 HSI, GT, Num_Classes, target_names = LoadHSIData(HSID)  # Load the HSI data
-# STEP 1: choose the requested spatial partition on ORIGINAL GT, before PCA.
-# Connected mode follows GitHub's class-wise contiguous sampling quotas, but
-# unlike the source project enforces ZERO train/val/test INPUT-PATCH overlap.
+# STEP 1: greedy block-based selection, then exact patch-safe held-out test.
 import hashlib
-# if args.split_protocol == "connected":
-#     if HSID not in ("HC", "HH"):
-#         raise ValueError("This paper protocol is configured for HC and HH only")
-#     Tr_xy, Va_xy, Te_xy, split_map, owner_map = github_connected_disjoint_split(
-#         GT, window_size=WS, buffer=args.spatial_buffer, seed=args.split_seed,
-#         search_trials=args.search_trials, train_pixels=args.connected_train_pixels,
-#         validation_pixels=args.connected_validation_pixels,
-#         min_test_per_class=args.min_test_per_class)
-#     gt_labels, gt_counts = np.unique(GT[GT > 0], return_counts=True)
-#     train_quota = (int(gt_counts.min()) // 10 if args.connected_train_pixels is None
-#                    else int(args.connected_train_pixels))
-#     val_quota = (train_quota // 5 if args.connected_validation_pixels is None
-#                  else int(args.connected_validation_pixels))
-#     print(f"Protocol=connected patch-safe; dataset={HSID}; "
-#           f"quotas/class: train={train_quota} val={val_quota}; "
-#           f"minimum test/class={args.min_test_per_class}")
-#     print("INFO: GitHub connected-region quotas replace the old 5/5/90 block ratio targets.")
-if args.split_protocol == "disjoint":
-    # Greedy SpikeSST-style class quotas; corrected to exact patch-nonoverlap.
-    # No extra spatial buffer or candidate-search trials are used.
-    if args.spatial_buffer != 0:
-        raise ValueError("disjoint sampling has no --spatial_buffer; use 0")
-    Tr_xy, Va_xy, Te_xy = disjoint_split_coords(
-        GT, train_ratio=float(effective_ratios[0]),
-        val_ratio=float(effective_ratios[1]), seed=args.split_seed,
-        window_size=WS, block=args.block_size)
-    split_map = np.zeros(GT.shape, dtype=np.uint8)
-    for idx, xy in enumerate((Tr_xy, Va_xy, Te_xy), start=1):
-        split_map[xy[:, 0], xy[:, 1]] = idx
-    owner_map = None  # SpikeSST does not return exclusive three-way owner regions.
-    train_quota = val_quota = -1
-else:
-    Tr_xy, Va_xy, Te_xy, split_map, owner_map = disjoint_spatial_split(
-        GT, window_size=WS,
-        train_ratio=trRatio, validation_ratio=vrRatio, test_ratio=teRatio,
-        block_size=args.block_size, buffer=args.spatial_buffer, seed=args.split_seed,
-        search_trials=args.search_trials)
-    train_quota = val_quota = -1
+Tr_xy, Va_xy, Te_xy = disjoint_split_coords(
+    GT, train_ratio=float(effective_ratios[0]),
+    val_ratio=float(effective_ratios[1]), seed=args.split_seed,
+    window_size=WS, block=args.block_size)
+split_map = np.zeros(GT.shape, dtype=np.uint8)
+for idx, xy in enumerate((Tr_xy, Va_xy, Te_xy), start=1):
+    split_map[xy[:, 0], xy[:, 1]] = idx
 
 # Persist the selected partition, seed and enough metadata for a reproducible
 # independent audit. Prevent overwriting saved evidence with different geometry.
 split_path = os.path.join(output_dir, "disjoint_spatial_split.npz")
-split_protocol_id = ("greedy_reflect_minimal_patchonly_v4"
-                     if args.split_protocol == "disjoint" else "spatial_blocks_patchsafe_v=1")
+split_protocol_id = "greedy_reflect_minimal_patchonly_v4"
 gt_digest = hashlib.sha256(np.ascontiguousarray(GT).tobytes()).hexdigest()
 class_ids = np.unique(GT[GT > 0])
 per_class_original = np.array([np.count_nonzero(GT == cls) for cls in class_ids], dtype=np.int64)
@@ -1275,29 +805,20 @@ per_class_support = np.stack([
               for cls in class_ids], dtype=np.int64)
     for coords in (Tr_xy, Va_xy, Te_xy)])
 per_class_excluded = per_class_original - per_class_support.sum(axis=0)
-if args.split_protocol != "disjoint" and (per_class_excluded < 0).any():
+if (per_class_excluded < 0).any():
     raise AssertionError("A labeled center was used in multiple subsets")
-# if args.split_protocol == "connected" and (per_class_support < 1).any():
-#     raise AssertionError("Selected protocol has zero support for a GT class")
 split_data = dict(
     train_coords=Tr_xy, validation_coords=Va_xy, test_coords=Te_xy,
-    split_map=split_map, owner_map=owner_map,
-    window_size=np.array(WS),
-    block_size=np.array(-1 if args.split_protocol == "connected" else args.block_size),
-    spatial_buffer=np.array(args.spatial_buffer), seed=np.array(args.split_seed),
-    model_seed=np.array(args.seed), search_trials=np.array(args.search_trials),
+    split_map=split_map,
+    window_size=np.array(WS), block_size=np.array(args.block_size),
+    spatial_buffer=np.array(0), seed=np.array(args.split_seed),
+    model_seed=np.array(args.seed),
     split_protocol=np.array(split_protocol_id), gt_sha256=np.array(gt_digest),
-    connected_train_pixels_per_class=np.array(train_quota),
-    connected_validation_pixels_per_class=np.array(val_quota),
-    min_test_per_class=np.array(args.min_test_per_class),
     class_ids=class_ids, class_original=per_class_original,
     class_train=per_class_support[0], class_validation=per_class_support[1],
     class_test=per_class_support[2], class_excluded=per_class_excluded,
     requested_ratios=np.array([trRatio, vrRatio, teRatio]),
     effective_ratios=effective_ratios)
-if args.split_protocol == "disjoint":
-    split_data.pop("owner_map")  # Not returned by upstream; don't invent ownership.
-    split_data.pop("search_trials")  # Upstream does not run candidate searches.
 if os.path.exists(split_path):
     with np.load(split_path, allow_pickle=False) as saved:
         for name, value in split_data.items():
@@ -1326,35 +847,27 @@ for name, coords in (("Train", Tr_xy), ("Validation", Va_xy), ("Test", Te_xy)):
 print(f"Labeled centers not selected for this split: {n_labeled - n_selected:,}")
 if n_selected:
     kept = np.array([len(Tr_xy), len(Va_xy), len(Te_xy)]) / n_selected
-    print("Selected-sample fractions:" if args.split_protocol == "disjoint"
-          else "Achieved fractions AFTER erosion:", np.round(kept, 4).tolist())
-    if args.split_protocol in ("blocks", "disjoint") and np.any(np.abs(kept - effective_ratios) > 0.025):
-        print("WARNING: retained ratios differ by >2.5 percentage points from targets; "
-              "spatially disjoint blocks cannot promise exact split percentages.")
+    print("Selected-sample fractions:", np.round(kept, 4).tolist())
 for group_name, coords in (("train", Tr_xy), ("validation", Va_xy), ("test", Te_xy)):
     labels, counts = np.unique(GT[coords[:, 0], coords[:, 1]], return_counts=True)
     print(group_name, "class support:", dict(zip(labels.tolist(), counts.tolist())))
-    sparse = {int(label): int(count) for label, count in zip(labels, counts) if count < 20}
-    if sparse and group_name != "test":
-        warnings.warn(f"{group_name} has fewer than 20 centers for classes {sparse}; "
-                      "pre-register how sparse classes are handled before publication")
+    # Actual per-class support is reported above; no arbitrary minimum enforced.
 # Independent reflect-aware input-source audit (no model/test-score selection).
-if args.split_protocol == "disjoint":
-    used_trainval = np.zeros(GT.shape, dtype=np.uint8)
-    for xy in (Tr_xy, Va_xy):
-        used_trainval[xy[:, 0], xy[:, 1]] = 1
-    forbidden_test = reflected_patch_overlap_mask(used_trainval, WS)
-    n_test_overlap = int(np.count_nonzero(forbidden_test[Te_xy[:, 0], Te_xy[:, 1]]))
-    if n_test_overlap:
-        raise AssertionError(f"Spatial leakage: {n_test_overlap} test patches reuse train/val source pixels")
-    used_train = np.zeros(GT.shape, dtype=np.uint8)
-    used_train[Tr_xy[:, 0], Tr_xy[:, 1]] = 1
-    train_overlap_val = int(np.count_nonzero(
-        reflected_patch_overlap_mask(used_train, WS)[Va_xy[:, 0], Va_xy[:, 1]]))
-    print(f"PASS: train/test and val/test share ZERO input source pixels "
-          f"(reflect-aware WS={WS}).", flush=True)
-    print(f"NOTE: {train_overlap_val:,}/{len(Va_xy):,} validation input patches "
-          "share source pixels with training; validation is not independent.", flush=True)
+used_trainval = np.zeros(GT.shape, dtype=np.uint8)
+for xy in (Tr_xy, Va_xy):
+    used_trainval[xy[:, 0], xy[:, 1]] = 1
+forbidden_test = reflected_patch_overlap_mask(used_trainval, WS)
+n_test_overlap = int(np.count_nonzero(forbidden_test[Te_xy[:, 0], Te_xy[:, 1]]))
+if n_test_overlap:
+    raise AssertionError(f"Spatial leakage: {n_test_overlap} test patches reuse train/val source pixels")
+used_train = np.zeros(GT.shape, dtype=np.uint8)
+used_train[Tr_xy[:, 0], Tr_xy[:, 1]] = 1
+train_overlap_val = int(np.count_nonzero(
+    reflected_patch_overlap_mask(used_train, WS)[Va_xy[:, 0], Va_xy[:, 1]]))
+print(f"PASS: train/test and val/test share ZERO input source pixels "
+      f"(reflect-aware WS={WS}).", flush=True)
+print(f"NOTE: {train_overlap_val:,}/{len(Va_xy):,} validation input patches "
+      "share source pixels with training; validation is not independent.", flush=True)
 # Greedy train/validation remain from the same block pool; validation is not independent.
 
 
@@ -1373,11 +886,11 @@ DL_Time = time.time() - start
 
 # STEP 3: Extract SpikeSST-selected patches; train/validation may share input pixels.
 Tr, TrC = extract_patches_at_coords(RDHSI, GT, Tr_xy, window_size=WS,
-                                      reflect_pad=(args.split_protocol == "disjoint"))
+                                      reflect_pad=True)
 Va, VaC = extract_patches_at_coords(RDHSI, GT, Va_xy, window_size=WS,
-                                      reflect_pad=(args.split_protocol == "disjoint"))
+                                      reflect_pad=True)
 Te, TeC = extract_patches_at_coords(RDHSI, GT, Te_xy, window_size=WS,
-                                      reflect_pad=(args.split_protocol == "disjoint"))
+                                      reflect_pad=True)
 
 
 TrC = to_categorical(TrC, num_classes=Num_Classes)

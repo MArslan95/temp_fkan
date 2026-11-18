@@ -1,0 +1,12 @@
+component,macs,2_flops_per_mac_equivalent
+token_projections,245760,491520
+gate_spline,16384,32768
+gate_base,2048,4096
+attention_qkv_spline,12582912,25165824
+attention_qkv_base,0,0
+attention_scores,4194304,8388608
+attention_value_mix,4194304,8388608
+attention_output_projection,524288,1048576
+recurrent_transition,1048576,2097152
+recurrent_input,1048576,2097152
+classifier,640,1280

@@ -1,0 +1,15 @@
+{
+  "dataset": "HC",
+  "window_size": 16,
+  "split_seed": 3407,
+  "model_seed": 3407,
+  "test_count": 159518,
+  "test_correct_count": 99330,
+  "test_predictions_only": true,
+  "unplotted_test_pixel_value": 0,
+  "class_labels_are_one_based": true,
+  "classification_maps": "disabled",
+  "full_scene_if_present": "visualization only; includes training, validation and excluded centers",
+  "full_scene_figures_generated": false,
+  "model_selection": "last epoch (no early stopping, no best-weight restoration)"
+}

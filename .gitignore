@@ -33,5 +33,8 @@ baseline_32_8_56/*
 /KanMamba_8_chnal_32_bs_56/
 /KanMamba_8_chnal_32_bs_56_buffer_32/
 /baseline_32_8_56/
-KanMamba__center_mean_way8_chnal_32_bs_56/ 
+KanMamba__center_mean_way8_chnal_32_bs_56/
 KanMamba_8_chnal_32_bs_56_strict_disjoint/
+KanMamba_8_chnal_32_bs_56_block40/
+KanMamba_8_chnal_32_bs_56_ split_42_blocksize_16/
+KanMamba_8_chnal_32_bs_56_ split_42_32/

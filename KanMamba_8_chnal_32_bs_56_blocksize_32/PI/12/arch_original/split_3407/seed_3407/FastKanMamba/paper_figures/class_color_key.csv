@@ -1,0 +1,11 @@
+class_id,class_name,color_hex
+1,"Ship",#870098
+2,"Seawater",#0000dd
+3,"Trees",#0098dd
+4," Concrete structure building",#00aa88
+5,"Floating pier",#00bc00
+6,"Brick houses",#00ff00
+7,"Steel houses",#efed00
+8," Wharf construction land",#ff9900
+9,"Car",#dc0000
+10,"Road",#cccccc

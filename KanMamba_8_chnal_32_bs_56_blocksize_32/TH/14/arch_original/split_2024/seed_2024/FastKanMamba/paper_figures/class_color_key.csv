@@ -1,0 +1,19 @@
+class_id,class_name,color_hex
+1,"Rubber track",#79008a
+2,"Flaggingv",#6d009c
+3,"Sandy",#0000b9
+4,"Asphalt",#002fdd
+5,"Boardwalk",#008add
+6,"Rocky shallows",#00a4bb
+7,"Grassland",#00aa90
+8,"Bulrush",#009b13
+9,"Gravel road",#00bc00
+10,"Ligustrum vicaryi",#00e200
+11,"Coniferous pine",#2cff00
+12,"Spiraea",#ccf900
+13,"Bare soil",#f5df00
+14,"Buxus sinica",#ffad00
+15,"Photinia serrulata",#ff2d00
+16,"Populus",#e40000
+17,"Ulmus pumila L",#ce0000
+18,"Seawater",#cccccc
